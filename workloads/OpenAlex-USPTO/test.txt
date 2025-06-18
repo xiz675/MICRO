@@ -1,0 +1,579 @@
+MATCH (w:Work3)-[:RELATED_TO]->(w2:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)
+RETURN t.name as tname, s.id as sid, t.id as tid, w2.name as w2name, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.sname, neo4j.w2name, neo4j.wname
+from neo4j, uspto.subfield_patent Subfield0, uspto.topic_patent Topic0, uspto.publication_cited_by_patent1 Work0, uspto.publication_cited_by_patent1 Work1
+where neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id and neo4j.wname = Work0.name and neo4j.w2name = Work1.name
+##########
+MATCH (w1:Work3)-[:ABOUT]->(t:Topic1),
+         (w2:Work3)-[:RELATED_TO]->(w1),
+         (w2)-[:ABOUT]->(t)
+RETURN t.name as tname, t.id as tid, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.tname, neo4j.w1name, neo4j.w2name
+from neo4j, uspto.publication_cited_by_patent Work0, uspto.topic_patent1 Topic0, uspto.publication_cited_by_patent1 Work1
+where neo4j.w2name = Work0.name and neo4j.tid = Topic0.id and neo4j.w1name = Work1.name
+##########
+MATCH (a1:Author2)<-[:CREATED_BY]-(w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(a2:Author2)
+RETURN w2.name as w2name, w1.name as w1name, a1.name as a1name, a2.name as a2name
+**********
+select neo4j.a2name, neo4j.a1name, neo4j.w2name, neo4j.w1name
+from neo4j, uspto.inventors Author0, uspto.inventors1 Author1, uspto.publication_cited_by_patent Work0
+where neo4j.a1name = Author0.name and neo4j.a2name = Author1.name and neo4j.w1name = Work0.name
+##########
+MATCH (w:Work3)-[:CREATED_BY]->(i:Institution2)<-[:CHILD_OF]-(child:Institution2)
+RETURN child.name as childname, i.name as iname, i.ror as iror, child.ror as childror, w.name as wname
+**********
+select neo4j.childname, neo4j.iname, neo4j.wname
+from neo4j, uspto.institution1 Institution0, uspto.institution2 Institution1, uspto.publication_cited_by_patent1 Work0
+where neo4j.childror = Institution0.ror and neo4j.iror = Institution1.ror and neo4j.wname = Work0.name
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname, neo4j.wname
+from neo4j, uspto.subfield_patent2 Subfield0, uspto.publication_cited_by_patent Work0, uspto.topic_patent1 Topic0, uspto.field_patent1 Field0
+where neo4j.sid = Subfield0.id and neo4j.wname = Work0.name and neo4j.tid = Topic0.id and neo4j.fid = Field0.id
+##########
+MATCH (t1:Topic1)-[:HAS_SIBLING]->(t2:Topic1)<-[:BELONGS_TO]-(k:Keyword)
+RETURN t2.name as t2name, k.name as kname, t1.name as t1name, t2.id as t2id, t1.id as t1id
+**********
+select neo4j.t2name, neo4j.kname, neo4j.t1name
+from neo4j, uspto.topic_patent Topic0, uspto.topic_patent2 Topic1
+where neo4j.t2id = Topic0.id and neo4j.t1id = Topic1.id
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(a:Author2)
+RETURN w1.id as w1id, w2.id as w2id, a.name as aname, w2.name as w2name, w1.name as w1name
+LIMIT 10
+**********
+select neo4j.w1id, neo4j.w1name, neo4j.w2id, neo4j.w2name, neo4j.aname
+from neo4j, uspto.inventors2 Author0, uspto.publication_cited_by_patent1 Work0, uspto.publication_cited_by_patent2 Work1
+where neo4j.aname = Author0.name and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)<-[:ABOUT]-(w:Work3)-[:CREATED_BY]->(a:Author2)
+RETURN k.name as kname, t.name as tname, a.name as aname, t.id as tid, w.name as wname
+**********
+select neo4j.tname, neo4j.aname, neo4j.kname, neo4j.wname
+from neo4j, uspto.inventors2 Author0, uspto.publication_cited_by_patent1 Work0, uspto.topic_patent Topic0
+where neo4j.aname = Author0.name and neo4j.wname = Work0.name and neo4j.tid = Topic0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent1 Work0, uspto.subfield_patent1 Subfield0, uspto.topic_patent Topic0, uspto.field_patent Field0
+where neo4j.wname = Work0.name and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id and neo4j.fid = Field0.id
+##########
+MATCH p=(w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(i:Institution2)
+RETURN i.name as iname, i.ror as iror, i.cited_by_count as icited_by_count, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.iname, neo4j.icited_by_count, neo4j.w1name, neo4j.w2name
+from neo4j, uspto.institution Institution0, uspto.publication_cited_by_patent1 Work0, uspto.publication_cited_by_patent2 Work1
+where neo4j.iror = Institution0.ror and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname, d.name as dname
+**********
+select neo4j.tname, neo4j.fname, neo4j.dname, neo4j.sname
+from neo4j, uspto.field_patent1 Field0, uspto.subfield_patent Subfield0, uspto.topic_patent Topic0
+where neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(b:Subfield)-[:BELONGS_TO]->(a:Field)-[:BELONGS_TO]->(domain:Domain)
+RETURN t.name as tname, b.id as bid, t.id as tid, a.id as aid, w.name as wname, domain.name as domainname
+**********
+select neo4j.tname, neo4j.domainname, neo4j.wname
+from neo4j, uspto.field_patent1 Field0, uspto.subfield_patent1 Subfield0, uspto.publication_cited_by_patent Work0, uspto.topic_patent Topic0
+where neo4j.aid = Field0.id and neo4j.bid = Subfield0.id and neo4j.wname = Work0.name and neo4j.tid = Topic0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:HAS_SIBLING]->(sibling:Topic1)
+RETURN sibling.id as siblingid, t.name as tname, sibling.name as siblingname, t.id as tid, w.name as wname
+**********
+select neo4j.tname, neo4j.siblingname, neo4j.wname
+from neo4j, uspto.topic_patent2 Topic0, uspto.topic_patent2 Topic1, uspto.publication_cited_by_patent1 Work0
+where neo4j.siblingid = Topic0.id and neo4j.tid = Topic1.id and neo4j.wname = Work0.name
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(i:Institution2)
+RETURN i.name as iname, i.ror as iror, a.name as aname, w2.name as w2name, w.name as wname
+**********
+select neo4j.iname, neo4j.aname, neo4j.w2name, neo4j.wname
+from neo4j, uspto.inventors Author0, uspto.institution2 Institution0, uspto.publication_cited_by_patent Work0
+where neo4j.aname = Author0.name and neo4j.iror = Institution0.ror and neo4j.w2name = Work0.name
+##########
+MATCH (t:Topic1)-[:HAS_SIBLING]->(sibling:Topic1)-[:BELONGS_TO]->(sub:Subfield)
+RETURN sub.id as subid, sibling.id as siblingid, t.name as tname, t.id as tid, sub.name as subname, sibling.name as siblingname
+**********
+select neo4j.tname, neo4j.siblingname, neo4j.subname
+from neo4j, uspto.subfield_patent1 Subfield0, uspto.topic_patent Topic0, uspto.topic_patent Topic1
+where neo4j.subid = Subfield0.id and neo4j.siblingid = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:HAS_SIBLING]->(sibling:Topic1)
+RETURN k.name as kname, sibling.id as siblingid, t.name as tname, t.id as tid, sibling.name as siblingname
+ORDER BY t.cited_by_count DESC
+**********
+select neo4j.tname, neo4j.siblingname, neo4j.kname
+from neo4j, uspto.topic_patent1 Topic0, uspto.topic_patent2 Topic1
+where neo4j.siblingid = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)<-[:ABOUT]-(w:Work3)
+RETURN k.name as kname, t.name as tname, t.id as tid, w.name as wname
+**********
+select neo4j.tname, neo4j.kname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent1 Work0, uspto.topic_patent Topic0
+where neo4j.wname = Work0.name and neo4j.tid = Topic0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)<-[:ABOUT]-(w:Work3)
+RETURN k.name as kname, t.name as tname, t.id as tid, w.name as wname
+**********
+select neo4j.tname, neo4j.kname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent1 Work0, uspto.topic_patent2 Topic0
+where neo4j.wname = Work0.name and neo4j.tid = Topic0.id
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3), 
+         (w1)-[:ABOUT]->(t:Topic1)<-[:ABOUT]-(w2)
+RETURN t.name as tname, t.id as tid, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.tname, neo4j.w1name, neo4j.w2name
+from neo4j, uspto.topic_patent2 Topic0, uspto.publication_cited_by_patent Work0, uspto.publication_cited_by_patent2 Work1
+where neo4j.tid = Topic0.id and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(i:Institution2)
+RETURN i.name as iname, i.ror as iror, a.name as aname, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.iname, neo4j.aname, neo4j.w1name, neo4j.w2name
+from neo4j, uspto.inventors2 Author0, uspto.publication_cited_by_patent Work0, uspto.institution1 Institution0
+where neo4j.aname = Author0.name and neo4j.w2name = Work0.name and neo4j.iror = Institution0.ror
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:ABOUT]->(t:Topic1)<-[:BELONGS_TO]-(es:Keyword)
+RETURN t.name as tname, t.id as tid, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.tname, neo4j.w1name, neo4j.w2name
+from neo4j, uspto.topic_patent Topic0, uspto.publication_cited_by_patent2 Work0, uspto.publication_cited_by_patent1 Work1
+where neo4j.tid = Topic0.id and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(h:Subfield)-[:BELONGS_TO]->(lj:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN t.name as tname, a.name as aname, h.id as hid, t.id as tid, lj.id as ljid, w.name as wname, d.name as dname
+**********
+select neo4j.tname, neo4j.aname, neo4j.dname, neo4j.wname
+from neo4j, uspto.subfield_patent2 Subfield0, uspto.publication_cited_by_patent Work0, uspto.topic_patent Topic0, uspto.inventors1 Author0, uspto.field_patent Field0
+where neo4j.hid = Subfield0.id and neo4j.wname = Work0.name and neo4j.tid = Topic0.id and neo4j.aname = Author0.name and neo4j.ljid = Field0.id
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(t:Topic1)
+RETURN t.name as tname, a.name as aname, t.id as tid, w.name as wname
+**********
+select neo4j.tname, neo4j.aname, neo4j.wname
+from neo4j, uspto.topic_patent2 Topic0, uspto.publication_cited_by_patent Work0, uspto.inventors Author0
+where neo4j.tid = Topic0.id and neo4j.wname = Work0.name and neo4j.aname = Author0.name
+##########
+MATCH (t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname
+from neo4j, uspto.field_patent2 Field0, uspto.subfield_patent2 Subfield0, uspto.topic_patent Topic0
+where neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic)-[:BELONGS_TO]->(s:Subfield)
+RETURN k.name as kname, t.name as tname, t.id as tid, s.id as sid, s.name as sname
+**********
+select neo4j.tname, neo4j.kname, neo4j.sname
+from neo4j, uspto.subfield_patent2 Subfield0, uspto.topic_patent1 Topic0
+where neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, w.id as wid, s.id as sid, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.wid, neo4j.sname, neo4j.wname
+from neo4j, uspto.topic_patent1 Topic0, uspto.field_patent Field0, uspto.subfield_patent2 Subfield0
+where neo4j.tid = Topic0.id and neo4j.fid = Field0.id and neo4j.sid = Subfield0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)<-[:BELONGS_TO]-(t2:Topic1)
+RETURN t2.name as t2name, t2.id as t2id, t.name as tname, s.id as sid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.t2name, neo4j.sname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent1 Work0, uspto.topic_patent Topic0, uspto.subfield_patent Subfield0
+where neo4j.wname = Work0.name and neo4j.t2id = Topic0.id and neo4j.sid = Subfield0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, w.cited_by_count as wcited_by_count, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname, neo4j.wname, neo4j.wcited_by_count
+from neo4j, uspto.publication_cited_by_patent2 Work0, uspto.field_patent Field0, uspto.subfield_patent Subfield0, uspto.topic_patent1 Topic0
+where neo4j.wname = Work0.name and neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(a:Author2)
+RETURN w1.id as w1id, w2.id as w2id, a.name as aname, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.w1id, neo4j.w1name, neo4j.w2id, neo4j.w2name, neo4j.aname
+from neo4j, uspto.inventors2 Author0, uspto.publication_cited_by_patent1 Work0, uspto.publication_cited_by_patent2 Work1
+where neo4j.aname = Author0.name and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:HAS_SIBLING]->(s:Topic1)
+RETURN k.name as kname, t.name as tname, t.id as tid, s.id as sid, s.name as sname
+**********
+select neo4j.tname, neo4j.kname, neo4j.sname
+from neo4j, uspto.topic_patent1 Topic0, uspto.topic_patent1 Topic1
+where neo4j.sid = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)
+RETURN t.name as tname, t.id as tid, s.id as sid, s.name as sname, w.name as wname
+ORDER BY w.cited_by_count DESC
+**********
+select neo4j.tname, neo4j.sname, neo4j.wname
+from neo4j, uspto.subfield_patent Subfield0, uspto.topic_patent1 Topic0, uspto.publication_cited_by_patent2 Work0
+where neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id and neo4j.wname = Work0.name
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent1 Work0, uspto.topic_patent Topic0, uspto.subfield_patent2 Subfield0
+where neo4j.wname = Work0.name and neo4j.tid = Topic0.id and neo4j.sid = Subfield0.id
+##########
+MATCH (t:Topic1)-[:HAS_SIBLING]->(siblingTopic:Topic1), (t)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN siblingTopic.id as siblingTopicid, f.name as fname, t.name as tname, siblingTopic.name as siblingTopicname, s.id as sid, f.id as fid, s.name as sname
+**********
+select neo4j.tname, neo4j.fname, neo4j.siblingTopicname, neo4j.sname
+from neo4j, uspto.subfield_patent2 Subfield0, uspto.topic_patent2 Topic0, uspto.field_patent1 Field0
+where neo4j.sid = Subfield0.id and neo4j.siblingTopicid = Topic0.id and neo4j.fid = Field0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN k.name as kname, f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname
+**********
+select neo4j.tname, neo4j.fname, neo4j.kname, neo4j.sname
+from neo4j, uspto.field_patent Field0, uspto.subfield_patent2 Subfield0, uspto.topic_patent Topic0
+where neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:HAS_SIBLING]->(sibling:Topic1)-[:BELONGS_TO]->(sub:Subfield)
+RETURN k.name as kname, sub.id as subid, sibling.id as siblingid, t.name as tname, t.id as tid, sub.name as subname, sibling.name as siblingname
+**********
+select neo4j.tname, neo4j.siblingname, neo4j.kname, neo4j.subname
+from neo4j, uspto.subfield_patent Subfield0, uspto.topic_patent1 Topic0, uspto.topic_patent2 Topic1
+where neo4j.subid = Subfield0.id and neo4j.siblingid = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)
+RETURN t.name as tname, t.id as tid, w.id as wid, s.id as sid, s.name as sname, w.name as wname
+LIMIT 10
+**********
+select neo4j.tname, neo4j.wid, neo4j.tid, neo4j.sname, neo4j.wname, neo4j.sid
+from neo4j, uspto.subfield_patent Subfield0, uspto.topic_patent2 Topic0, uspto.publication_cited_by_patent1 Work0
+where neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id and neo4j.wname = Work0.name
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, w.cited_by_count as wcited_by_count, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname, neo4j.wname, neo4j.wcited_by_count
+from neo4j, uspto.publication_cited_by_patent Work0, uspto.field_patent1 Field0, uspto.subfield_patent2 Subfield0, uspto.topic_patent Topic0
+where neo4j.wname = Work0.name and neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:HAS_SIBLING]->(sibling:Topic1)<-[:ABOUT]-(w:Work3)
+RETURN k.name as kname, sibling.id as siblingid, t.name as tname, sibling.name as siblingname, t.id as tid, w.id as wid, w.name as wname
+**********
+select neo4j.tname, neo4j.wid, neo4j.kname, neo4j.wname, neo4j.siblingname
+from neo4j, uspto.publication_cited_by_patent Work0, uspto.topic_patent Topic0, uspto.topic_patent Topic1
+where neo4j.wname = Work0.name and neo4j.siblingid = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(a:Author2)
+RETURN a.name as aname, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.aname, neo4j.w1name, neo4j.w2name
+from neo4j, uspto.inventors1 Author0, uspto.publication_cited_by_patent1 Work0, uspto.publication_cited_by_patent1 Work1
+where neo4j.aname = Author0.name and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN k.name as kname, f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname, d.name as dname
+**********
+select neo4j.tname, neo4j.fname, neo4j.dname, neo4j.kname, neo4j.sname
+from neo4j, uspto.field_patent Field0, uspto.subfield_patent1 Subfield0, uspto.topic_patent Topic0
+where neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:HAS_SIBLING]->(t2:Topic1)
+RETURN t2.name as t2name, k.name as kname, t2.id as t2id, t.name as tname, t.id as tid
+**********
+select neo4j.tname, neo4j.t2name, neo4j.kname
+from neo4j, uspto.topic_patent Topic0, uspto.topic_patent Topic1
+where neo4j.t2id = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:HAS_SIBLING]->(t2:Topic1)
+RETURN t2.name as t2name, k.name as kname, t2.id as t2id, t.name as tname, t.id as tid
+**********
+select neo4j.tname, neo4j.t2name, neo4j.kname
+from neo4j, uspto.topic_patent Topic0, uspto.topic_patent Topic1
+where neo4j.t2id = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(sub:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN sub.id as subid, f.name as fname, t.name as tname, t.id as tid, sub.name as subname, f.id as fid, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.subname, neo4j.wname
+from neo4j, uspto.topic_patent2 Topic0, uspto.field_patent1 Field0, uspto.subfield_patent2 Subfield0, uspto.publication_cited_by_patent1 Work0
+where neo4j.tid = Topic0.id and neo4j.fid = Field0.id and neo4j.subid = Subfield0.id and neo4j.wname = Work0.name
+##########
+MATCH (w:Work3)-[:CREATED_BY]->(i:Institution2)-[:CHILD_OF]->(i2:Institution2)
+RETURN i.name as iname, i.ror as iror, i2.name as i2name, i2.ror as i2ror, w.name as wname
+**********
+select neo4j.i2name, neo4j.iname, neo4j.wname
+from neo4j, uspto.institution1 Institution0, uspto.institution Institution1, uspto.publication_cited_by_patent1 Work0
+where neo4j.i2ror = Institution0.ror and neo4j.iror = Institution1.ror and neo4j.wname = Work0.name
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, s.name as sname, w.name as wname, d.name as dname
+**********
+select neo4j.tname, neo4j.fname, neo4j.dname, neo4j.sname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent Work0, uspto.topic_patent Topic0, uspto.subfield_patent1 Subfield0
+where neo4j.wname = Work0.name and neo4j.tid = Topic0.id and neo4j.sid = Subfield0.id
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(a:Author2)
+RETURN w1.id as w1id, w2.id as w2id, a.name as aname, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.w1id, neo4j.w1name, neo4j.w2id, neo4j.w2name, neo4j.aname
+from neo4j, uspto.inventors2 Author0, uspto.publication_cited_by_patent Work0, uspto.publication_cited_by_patent1 Work1
+where neo4j.aname = Author0.name and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, w.id as wid, s.id as sid, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.wid, neo4j.sname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent2 Work0, uspto.field_patent Field0, uspto.subfield_patent1 Subfield0, uspto.topic_patent Topic0
+where neo4j.wname = Work0.name and neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent2 Work0, uspto.topic_patent2 Topic0, uspto.subfield_patent Subfield0, uspto.field_patent2 Field0
+where neo4j.wname = Work0.name and neo4j.tid = Topic0.id and neo4j.sid = Subfield0.id and neo4j.fid = Field0.id
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:CREATED_BY]->(i:Institution2)
+RETURN i.name as iname, i.ror as iror, w2.name as w2name, w1.name as w1name
+**********
+select neo4j.iname, neo4j.w1name, neo4j.w2name
+from neo4j, uspto.institution2 Institution0, uspto.publication_cited_by_patent Work0, uspto.publication_cited_by_patent Work1
+where neo4j.iror = Institution0.ror and neo4j.w2name = Work0.name and neo4j.w1name = Work1.name
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3),
+          (w)-[:ABOUT]->(t:Topic1)<-[:BELONGS_TO]-(k:Keyword),
+          (w)-[:ABOUT]->(t2:Topic1)<-[:BELONGS_TO]-(k)
+RETURN k.name as kname, t2.id as t2id, a.name as aname, t.id as tid, w.name as wname
+**********
+select neo4j.aname, neo4j.kname, neo4j.wname
+from neo4j, uspto.publication_cited_by_patent1 Work0, uspto.topic_patent2 Topic0, uspto.inventors1 Author0, uspto.topic_patent2 Topic1
+where neo4j.wname = Work0.name and neo4j.t2id = Topic0.id and neo4j.aname = Author0.name and neo4j.tid = Topic1.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN k.name as kname, f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname
+**********
+select neo4j.tname, neo4j.fname, neo4j.kname, neo4j.sname
+from neo4j, uspto.field_patent1 Field0, uspto.subfield_patent1 Subfield0, uspto.topic_patent Topic0
+where neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN f.name as fname, t.name as tname, f.id as fid, d.id as did, a.name as aname, t.id as tid, s.id as sid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.did, neo4j.fname, neo4j.sname, neo4j.wname, neo4j.aname
+from neo4j, uspto.field_patent1 Field0, uspto.inventors2 Author0, uspto.publication_cited_by_patent1 Work0, uspto.subfield_patent Subfield0, uspto.topic_patent Topic0
+where neo4j.fid = Field0.id and neo4j.aname = Author0.name and neo4j.wname = Work0.name and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (t1:Topic1)-[:HAS_SIBLING]->(t2:Topic1)<-[:BELONGS_TO]-(k:Keyword)
+RETURN t2.name as t2name, k.name as kname, t1.name as t1name, t2.id as t2id, t1.id as t1id
+LIMIT 10
+**********
+select neo4j.t1name, neo4j.t2name, neo4j.kname, neo4j.t1id, neo4j.t2id
+from neo4j, uspto.topic_patent2 Topic0, uspto.topic_patent1 Topic1
+where neo4j.t2id = Topic0.id and neo4j.t1id = Topic1.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, t.name as tname, t.id as tid, s.id as sid, f.id as fid, s.name as sname, w.name as wname
+**********
+select neo4j.tname, neo4j.fname, neo4j.sname, neo4j.wname
+from neo4j, uspto.subfield_patent2 Subfield0, uspto.field_patent2 Field0, uspto.topic_patent Topic0, uspto.publication_cited_by_patent Work0
+where neo4j.sid = Subfield0.id and neo4j.fid = Field0.id and neo4j.tid = Topic0.id and neo4j.wname = Work0.name
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)<-[:ABOUT]-(w:Work3)-[:CREATED_BY]->(a:Author2)
+RETURN a.name as aname, w.name as wname, k.name as kname, t.name as tname, t.id as tid
+**********
+select neo4j.wname, neo4j.aname, neo4j.tname, neo4j.kname
+from neo4j, uspto.inventors Author0, uspto.publication_cited_by_patent2 Work0, uspto.topic_patent1 Topic0
+where neo4j.aname = Author0.name and neo4j.wname = Work0.name and neo4j.tid = Topic0.id
+##########
+MATCH p=(a:Author2)-[:WORK_AT]->(i:Institution2)<-[:CHILD_OF]-(parentInst:Institution2)-[:CHILD_OF]->(grandInst:Institution2)
+RETURN a.name as aname, grandInst.name as grandInstname, grandInst.ror as grandInstror, i.name as iname, i.ror as iror, parentInst.name as parentInstname
+**********
+select neo4j.parentInstname, neo4j.aname, neo4j.iname, neo4j.grandInstname
+from neo4j, uspto.institution1 Institution0, uspto.inventors Author0, uspto.institution2 Institution1
+where neo4j.iror = Institution0.ror and neo4j.aname = Author0.name and neo4j.grandInstror = Institution1.ror
+##########
+MATCH (i:Institution2)<-[:WORK_AT]-(a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(z:Topic1)-[:BELONGS_TO]->(s:Subfield)
+RETURN a.name as aname, z.id as zid, w.name as wname, i.name as iname, s.id as sid, i.ror as iror, s.name as sname
+**********
+select neo4j.wname, neo4j.aname, neo4j.iname, neo4j.sname
+from neo4j, uspto.inventors2 Author0, uspto.publication_cited_by_patent2 Work0, uspto.topic_patent Topic0, uspto.subfield_patent Subfield0, uspto.institution1 Institution0
+where neo4j.aname = Author0.name and neo4j.wname = Work0.name and neo4j.zid = Topic0.id and neo4j.sid = Subfield0.id and neo4j.iror = Institution0.ror
+##########
+MATCH (t:Topic1)-[:HAS_SIBLING]->(sibling:Topic1)-[:BELONGS_TO]->(s:Subfield)
+RETURN sibling.id as siblingid, t.name as tname, s.id as sid, sibling.name as siblingname, t.id as tid, s.name as sname
+**********
+select neo4j.tname, neo4j.siblingname, neo4j.sname
+from neo4j, uspto.subfield_patent2 Subfield0, uspto.topic_patent Topic0, uspto.topic_patent1 Topic1
+where neo4j.sid = Subfield0.id and neo4j.siblingid = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (i:Institution2)<-[:WORK_AT]-(a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(t:Topic1)
+RETURN a.name as aname, w.name as wname, t.name as tname, i.name as iname, i.ror as iror, t.id as tid
+**********
+select neo4j.wname, neo4j.tname, neo4j.aname, neo4j.iname
+from neo4j, uspto.topic_patent1 Topic0, uspto.institution2 Institution0, uspto.inventors Author0
+where neo4j.tid = Topic0.id and neo4j.iror = Institution0.ror and neo4j.aname = Author0.name
+##########
+MATCH (w:Work3)-[:CREATED_BY]->(a:Author2)-[:WORK_AT]->(i:Institution2)
+RETURN a.name as aname, w.name as wname, i.name as iname, w.year as wyear, i.ror as iror
+**********
+select neo4j.wname, neo4j.aname, neo4j.iname, neo4j.wyear
+from neo4j, uspto.institution1 Institution0, uspto.inventors Author0, uspto.publication_cited_by_patent Work0
+where neo4j.iror = Institution0.ror and neo4j.aname = Author0.name and neo4j.wname = Work0.name
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(t:Topic1),
+      (t)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN a.name as aname, w.name as wname, f.name as fname, t.name as tname, s.id as sid, w.year as wyear, t.id as tid, s.name as sname
+**********
+select neo4j.tname, neo4j.wname, neo4j.aname, neo4j.sname, neo4j.fname, neo4j.wyear
+from neo4j, uspto.topic_patent Topic0, uspto.subfield_patent1 Subfield0, uspto.inventors1 Author0
+where neo4j.tid = Topic0.id and neo4j.sid = Subfield0.id and neo4j.aname = Author0.name
+##########
+MATCH (w1:Work3)-[:ABOUT]->(t:Topic1)<-[:ABOUT]-(w2:Work3)-[:CREATED_BY]->(i:Institution2)
+RETURN w1.name as w1name, t.name as tname, i.name as iname, w2.name as w2name, i.ror as iror, t.id as tid
+**********
+select neo4j.tname, neo4j.w1name, neo4j.w2name, neo4j.iname
+from neo4j, uspto.topic_patent Topic0, uspto.institution Institution0, uspto.publication_cited_by_patent2 Work0
+where neo4j.tid = Topic0.id and neo4j.iror = Institution0.ror and neo4j.w1name = Work0.name
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(sf:Subfield)
+RETURN a.name as aname, sf.name as sfname, w.name as wname, t.name as tname, sf.id as sfid, t.id as tid
+**********
+select neo4j.wname, neo4j.aname, neo4j.tname, neo4j.sfname
+from neo4j, uspto.topic_patent1 Topic0, uspto.publication_cited_by_patent2 Work0, uspto.inventors Author0, uspto.subfield_patent1 Subfield0
+where neo4j.tid = Topic0.id and neo4j.wname = Work0.name and neo4j.aname = Author0.name and neo4j.sfid = Subfield0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN d.name as dname, w.name as wname, f.name as fname, t.name as tname, f.id as fid, s.id as sid, t.id as tid, s.name as sname
+**********
+select neo4j.dname, neo4j.tname, neo4j.wname, neo4j.sname, neo4j.fname
+from neo4j, uspto.topic_patent2 Topic0, uspto.field_patent Field0, uspto.publication_cited_by_patent1 Work0, uspto.subfield_patent Subfield0
+where neo4j.tid = Topic0.id and neo4j.fid = Field0.id and neo4j.wname = Work0.name and neo4j.sid = Subfield0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:HAS_SIBLING]->(sibling:Topic1)<-[:ABOUT]-(w:Work3)
+RETURN w.name as wname, sibling.id as siblingid, k.name as kname, t.name as tname, t.id as tid, sibling.name as siblingname, w.year as wyear
+**********
+select neo4j.tname, neo4j.wname, neo4j.siblingname, neo4j.kname, neo4j.wyear
+from neo4j, uspto.publication_cited_by_patent2 Work0, uspto.topic_patent1 Topic0, uspto.topic_patent2 Topic1
+where neo4j.wname = Work0.name and neo4j.siblingid = Topic0.id and neo4j.tid = Topic1.id
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3),
+      (w)-[:ABOUT]->(t:Topic1)<-[:BELONGS_TO]-(k:Keyword)
+RETURN a.name as aname, w.name as wname, k.name as kname, t.id as tid, a.cited_by_count as acited_by_count
+**********
+select neo4j.wname, neo4j.aname, neo4j.acited_by_count, neo4j.kname
+from neo4j, uspto.topic_patent2 Topic0, uspto.publication_cited_by_patent1 Work0, uspto.inventors1 Author0
+where neo4j.tid = Topic0.id and neo4j.wname = Work0.name and neo4j.aname = Author0.name
+##########
+MATCH (f:Field)<-[:BELONGS_TO]-(s:Subfield)<-[:BELONGS_TO]-(t:Topic1)<-[:ABOUT]-(w:Work3)-[:CREATED_BY]->(a:Author2)
+RETURN a.name as aname, w.name as wname, f.name as fname, t.name as tname, f.id as fid, s.id as sid, t.id as tid, s.name as sname
+**********
+select neo4j.tname, neo4j.wname, neo4j.aname, neo4j.sname, neo4j.fname
+from neo4j, uspto.field_patent1 Field0, uspto.inventors1 Author0, uspto.topic_patent2 Topic0, uspto.subfield_patent1 Subfield0, uspto.publication_cited_by_patent2 Work0
+where neo4j.fid = Field0.id and neo4j.aname = Author0.name and neo4j.tid = Topic0.id and neo4j.sid = Subfield0.id and neo4j.wname = Work0.name
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(sf:Subfield)-[:BELONGS_TO]->(f:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN sf.name as sfname, d.name as dname, w.name as wname, f.name as fname, t.name as tname, f.id as fid, t.id as tid
+**********
+select neo4j.dname, neo4j.tname, neo4j.wname, neo4j.sfname, neo4j.fname
+from neo4j, uspto.field_patent1 Field0, uspto.publication_cited_by_patent2 Work0, uspto.topic_patent Topic0
+where neo4j.fid = Field0.id and neo4j.wname = Work0.name and neo4j.tid = Topic0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:HAS_SIBLING]->(t2:Topic1)
+RETURN w.name as wname, t.name as tname, w.year as wyear, t.id as tid, t2.id as t2id, t2.name as t2name, w.id as wid
+**********
+select neo4j.tname, neo4j.tid, neo4j.wname, neo4j.t2id, neo4j.wid, neo4j.t2name, neo4j.wyear
+from neo4j, uspto.topic_patent1 Topic0, uspto.topic_patent1 Topic1, uspto.publication_cited_by_patent Work0
+where neo4j.t2id = Topic0.id and neo4j.tid = Topic1.id and neo4j.wname = Work0.name
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic)-[:BELONGS_TO]->(s:Subfield),
+      (s)-[:BELONGS_TO]->(f:Field)
+RETURN f.name as fname, k.name as kname, t.name as tname, f.id as fid, s.id as sid, t.id as tid, s.name as sname
+**********
+select neo4j.fname, neo4j.tname, neo4j.sname, neo4j.kname
+from neo4j, uspto.field_patent1 Field0, uspto.subfield_patent2 Subfield0, uspto.topic_patent2 Topic0
+where neo4j.fid = Field0.id and neo4j.sid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (k:Keyword)-[:BELONGS_TO]->(t:Topic1)-[:BELONGS_TO]->(sf:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN sf.name as sfname, f.name as fname, k.name as kname, t.name as tname, f.id as fid, t.id as tid, sf.id as sfid
+**********
+select neo4j.fname, neo4j.tname, neo4j.sfname, neo4j.kname
+from neo4j, uspto.field_patent1 Field0, uspto.subfield_patent Subfield0, uspto.topic_patent1 Topic0
+where neo4j.fid = Field0.id and neo4j.sfid = Subfield0.id and neo4j.tid = Topic0.id
+##########
+MATCH (a:Author2)<-[:CREATED_BY]-(w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(sf:Subfield)
+RETURN a.name as aname, sf.name as sfname, w.name as wname, sf.id as sfid, t.id as tid, a.id as aid
+**********
+select neo4j.aname, neo4j.aid, neo4j.sfname
+from neo4j, uspto.topic_patent Topic0, uspto.publication_cited_by_patent Work0, uspto.subfield_patent2 Subfield0, uspto.inventors Author0
+where neo4j.tid = Topic0.id and neo4j.wname = Work0.name and neo4j.sfid = Subfield0.id and neo4j.aname = Author0.name
+##########
+MATCH (a:Author2)-[:WORK_AT]->(i:Institution2)<-[:CHILD_OF]-(parent:Institution2)
+RETURN a.name as aname, i.name as iname, parent.ror as parentror, i.ror as iror, parent.name as parentname
+**********
+select neo4j.parentname, neo4j.aname, neo4j.iname
+from neo4j, uspto.institution Institution0, uspto.institution1 Institution1, uspto.inventors2 Author0
+where neo4j.parentror = Institution0.ror and neo4j.iror = Institution1.ror and neo4j.aname = Author0.name
+##########
+MATCH (a1:Author2)<-[:CREATED_BY]-(w:Work3)-[:RELATED_TO]->(relatedWork:Work3)-[:CREATED_BY]->(a2:Author2)
+RETURN w.name as wname, relatedWork.name as relatedWorkname, a1.name as a1name, a2.name as a2name
+**********
+select neo4j.wname, neo4j.relatedWorkname, neo4j.a2name, neo4j.a1name
+from neo4j, uspto.publication_cited_by_patent Work0, uspto.publication_cited_by_patent1 Work1, uspto.inventors2 Author0
+where neo4j.wname = Work0.name and neo4j.relatedWorkname = Work1.name and neo4j.a1name = Author0.name
+##########
+MATCH (w1:Work3)-[:RELATED_TO]->(w2:Work3)-[:RELATED_TO]->(w3:Work3)
+RETURN w1.id as w1id, w2.id as w2id, w1.name as w1name, w3.id as w3id, w3.name as w3name, w2.name as w2name
+**********
+select neo4j.w1name, neo4j.w3id, neo4j.w1id, neo4j.w2id, neo4j.w2name, neo4j.w3name
+from neo4j, uspto.publication_cited_by_patent Work0, uspto.publication_cited_by_patent2 Work1, uspto.publication_cited_by_patent1 Work2
+where neo4j.w3name = Work0.name and neo4j.w2name = Work1.name and neo4j.w1name = Work2.name
+##########
+MATCH (a1:Author2)<-[:CREATED_BY]-(w:Work3)-[:CREATED_BY]->(a2:Author2)-[:WORK_AT]->(i:Institution2)
+RETURN w.name as wname, i.name as iname, a1.name as a1name, i.ror as iror, a2.name as a2name
+**********
+select neo4j.wname, neo4j.a2name, neo4j.a1name, neo4j.iname
+from neo4j, uspto.publication_cited_by_patent1 Work0, uspto.inventors1 Author0, uspto.institution2 Institution0
+where neo4j.wname = Work0.name and neo4j.a1name = Author0.name and neo4j.iror = Institution0.ror
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN w.name as wname, f.name as fname, t.name as tname, f.id as fid, s.id as sid, t.id as tid, s.name as sname, w.id as wid
+**********
+select neo4j.tname, neo4j.wname, neo4j.wid, neo4j.sname, neo4j.fname
+from neo4j, uspto.subfield_patent2 Subfield0, uspto.publication_cited_by_patent Work0, uspto.field_patent2 Field0, uspto.topic_patent1 Topic0
+where neo4j.sid = Subfield0.id and neo4j.wname = Work0.name and neo4j.fid = Field0.id and neo4j.tid = Topic0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)<-[:BELONGS_TO]-(k:Keyword)
+RETURN w.name as wname, k.name as kname, t.name as tname, t.id as tid
+**********
+select neo4j.wname, neo4j.tname, neo4j.kname
+from neo4j, uspto.topic_patent1 Topic0, uspto.publication_cited_by_patent1 Work0
+where neo4j.tid = Topic0.id and neo4j.wname = Work0.name
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)
+RETURN w.name as wname, f.name as fname, t.name as tname, f.id as fid, s.id as sid, t.id as tid, s.name as sname
+**********
+select neo4j.wname, neo4j.fname, neo4j.tname, neo4j.sname
+from neo4j, uspto.publication_cited_by_patent2 Work0, uspto.topic_patent Topic0, uspto.subfield_patent1 Subfield0, uspto.field_patent2 Field0
+where neo4j.wname = Work0.name and neo4j.tid = Topic0.id and neo4j.sid = Subfield0.id and neo4j.fid = Field0.id
+##########
+MATCH (w:Work3)-[:ABOUT]->(t:Topic1)-[:BELONGS_TO]->(s:Subfield)-[:BELONGS_TO]->(f:Field)-[:BELONGS_TO]->(d:Domain)
+RETURN d.name as dname, w.name as wname, f.name as fname, t.name as tname, f.id as fid, s.id as sid, t.id as tid, s.name as sname
+**********
+select neo4j.dname, neo4j.tname, neo4j.wname, neo4j.sname, neo4j.fname
+from neo4j, uspto.subfield_patent1 Subfield0, uspto.publication_cited_by_patent2 Work0, uspto.field_patent2 Field0, uspto.topic_patent Topic0
+where neo4j.sid = Subfield0.id and neo4j.wname = Work0.name and neo4j.fid = Field0.id and neo4j.tid = Topic0.id
+##########
+MATCH (t1:Topic1)-[:HAS_SIBLING]->(t2:Topic1)<-[:ABOUT]-(w:Work3)
+RETURN t1.id as t1id, w.name as wname, t1.name as t1name, t2.id as t2id, t2.name as t2name
+**********
+select neo4j.wname, neo4j.t2name, neo4j.t1name
+from neo4j, uspto.publication_cited_by_patent Work0, uspto.topic_patent2 Topic0, uspto.topic_patent2 Topic1
+where neo4j.wname = Work0.name and neo4j.t2id = Topic0.id and neo4j.t1id = Topic1.id
