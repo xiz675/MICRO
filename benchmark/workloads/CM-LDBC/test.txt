@@ -1,0 +1,905 @@
+MATCH (post:Post1)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)
+
+RETURN tagClass.id as tagClassid, tag.id as tagid, post.id as postid
+**********
+select neo4j.postid, Tag0.name, Post0.content
+from neo4j,TagClass TagClass0, Tag Tag0, Post Post0
+where Post0.creationDate > $param and TagClass0.name = $param and neo4j.tagClassid = TagClass0.id and neo4j.tagid = Tag0.id and neo4j.postid = Post0.id
+##########
+MATCH (p:Person1)-[:WORK_AT]->(o:Organisation)-[:IS_LOCATED_IN]->(c:Country)
+
+RETURN o.id as oid, c.id as cid, p.id as pid
+**********
+select Organisation0.name, Person0.lastName, Country0.name, Person0.firstName
+from neo4j,Country Country0, Organisation Organisation0, Person Person0
+where Country0.name = $param and Organisation0.name = $param and neo4j.cid = Country0.id and neo4j.oid = Organisation0.id and neo4j.pid = Person0.id
+##########
+MATCH (person:Person)-[:LIKES]->(post:Post1)-[:HAS_CREATOR]->(creator:Person)
+
+RETURN person.id as personid, creator.id as creatorid, post.id as postid
+**********
+select neo4j.postid, Person1.lastName, Post0.content, Person1.firstName
+from neo4j,Person Person0, Post Post0, Person Person1
+where Person1.browserUsed = $param and Person0.email = $param and neo4j.creatorid = Person0.id and neo4j.postid = Post0.id and neo4j.personid = Person1.id
+##########
+MATCH (person:Person1)-[:HAS_INTEREST]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)
+
+RETURN tagClass.id as tagClassid, person.id as personid, tag.id as tagid
+**********
+select Tag0.name, Person0.lastName, Person0.firstName
+from neo4j,Tag Tag0, Person Person0, TagClass TagClass0
+where Person0.birthday > $param and TagClass0.name = $param and neo4j.tagid = Tag0.id and neo4j.personid = Person0.id and neo4j.tagClassid = TagClass0.id
+##########
+MATCH (p:Person)-[:LIKES]->(post:Post2)-[:HAS_CREATOR]->(creator:Person)-[:IS_LOCATED_IN]->(place:Place)
+
+RETURN place.id as placeid, creator.id as creatorid, post.id as postid, p.id as pid
+**********
+select Person1.firstName, Person0.lastName, Person0.firstName, Post0.content, Person1.lastName
+from neo4j,Place Place0, Person Person0, Post Post0, Person Person1
+where Post0.creationDate > $param and Place0.name = $param and neo4j.placeid = Place0.id and neo4j.pid = Person0.id and neo4j.postid = Post0.id and neo4j.creatorid = Person1.id
+##########
+MATCH (p:Person)-[:STUDY_AT]->(u:University)-[:IS_LOCATED_IN]->(place:Place)<-[:IS_LOCATED_IN]-(org:Organisation)
+
+RETURN org.id as orgid, place.id as placeid, u.id as uid, p.id as pid
+**********
+select Organisation0.name, Person0.firstName, University0.name, Place0.name, Person0.lastName
+from neo4j,Place Place0, Organisation Organisation0, University University0, Person Person0
+where Organisation0.name = $param and Person0.browserUsed = $param and neo4j.placeid = Place0.id and neo4j.orgid = Organisation0.id and neo4j.uid = University0.id and neo4j.pid = Person0.id
+##########
+MATCH (f:Forum)-[:CONTAINER_OF]->(post:Post1)-[:HAS_TAG]->(tag:Tag)<-[:HAS_INTEREST]-(p:Person1)
+
+RETURN tag.id as tagid, post.id as postid, p.id as pid, f.id as fid
+**********
+select Post0.content, Person0.firstName, Tag0.name, Forum0.title, Person0.lastName
+from neo4j,Person Person0, Post Post0, Tag Tag0, Forum Forum0
+where Forum0.title = $param and Person0.gender = $param and neo4j.pid = Person0.id and neo4j.postid = Post0.id and neo4j.tagid = Tag0.id and neo4j.fid = Forum0.id
+##########
+MATCH (comment:Comment1)-[:REPLY_OF]->(post:Post2)-[:HAS_TAG]->(tag:Tag)
+
+RETURN comment.id as commentid, post.id as postid, tag.id as tagid
+**********
+select Tag0.name, Post0.content, Comment0.content
+from neo4j,Post Post0, Comment Comment0, Tag Tag0
+where Tag0.name = $param and Comment0.browserUsed = $param and neo4j.postid = Post0.id and neo4j.commentid = Comment0.id and neo4j.tagid = Tag0.id
+##########
+MATCH (p:Person)-[:WORK_AT]->(c:Company)-[:IS_LOCATED_IN]->(country:Country)
+
+RETURN country.id as countryid, c.id as cid, p.id as pid
+**********
+select Country0.name, Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Company Company0, Country Country0, Person Person0
+where Country0.name = $param and Company0.name = $param and neo4j.cid = Company0.id and neo4j.countryid = Country0.id and neo4j.pid = Person0.id
+##########
+MATCH (p1:Person)-[:KNOWS]->(p2:Person1)-[:LIKES]->(post:Post1)-[:HAS_CREATOR]-(creator:Person)
+
+RETURN creator.id as creatorid, post.id as postid, p1.id as p1id, p2.id as p2id
+**********
+select Person1.firstName, Person0.lastName, Person2.firstName, Person1.lastName, neo4j.postid, Post0.content, Person0.firstName, Person2.lastName
+from neo4j,Post Post0, Person Person0, Person Person1, Person Person2
+where Post0.creationDate > $param and Person0.locationIP = $param and neo4j.postid = Post0.id and neo4j.p1id = Person0.id and neo4j.p2id = Person1.id and neo4j.creatorid = Person2.id
+##########
+MATCH (c:Comment2)-[:REPLY_OF]->(post:Post1)<-[:CONTAINER_OF]-(f:Forum2)
+
+RETURN post.id as postid, c.id as cid, f.id as fid
+**********
+select neo4j.cid, Comment0.content, neo4j.postid, Forum0.title, Post0.content
+from neo4j,Post Post0, Comment Comment0, Forum Forum0
+where Forum0.title = $param and Comment0.length > $param and neo4j.postid = Post0.id and neo4j.cid = Comment0.id and neo4j.fid = Forum0.id
+##########
+MATCH (p:Person1)-[:LIKES]->(m:Message1)-[:HAS_CREATOR]->(creator:Person1)
+
+RETURN m.id as mid, creator.id as creatorid, p.id as pid
+**********
+select Person0.firstName, Person1.firstName, Message0.content, Person1.lastName, Person0.lastName
+from neo4j,Person Person0, Message Message0, Person Person1
+where Person0.locationIP = $param and Person1.email = $param and neo4j.creatorid = Person0.id and neo4j.mid = Message0.id and neo4j.pid = Person1.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)-[:IS_SUBCLASS_OF]->(superTc:TagClass)
+
+RETURN superTc.id as superTcid, tc.id as tcid, p.id as pid, t.id as tid
+**********
+select TagClass1.name, Tag0.name, Person0.firstName
+from neo4j,TagClass TagClass0, Tag Tag0, Person Person0, TagClass TagClass1
+where TagClass0.name = $param and neo4j.superTcid = TagClass0.id and neo4j.tid = Tag0.id and neo4j.pid = Person0.id and neo4j.tcid = TagClass1.id
+##########
+MATCH (p:Person)-[:LIKES]->(c:Comment2)-[:REPLY_OF]->(m:Message2)-[:HAS_CREATOR]->(creator:Person1)
+
+RETURN m.id as mid, creator.id as creatorid, c.id as cid, p.id as pid
+**********
+select Person0.firstName, Comment0.content, Person1.firstName, Message0.content, Person1.lastName, Person0.lastName
+from neo4j,Person Person0, Comment Comment0, Person Person1, Message Message0
+where Person1.speaks CONTAINS $param and Person0.birthday < $param and neo4j.creatorid = Person0.id and neo4j.cid = Comment0.id and neo4j.pid = Person1.id and neo4j.mid = Message0.id
+##########
+MATCH (person:Person1)<-[:HAS_CREATOR]-(msg:Message1)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)
+
+RETURN tagClass.id as tagClassid, person.id as personid, msg.id as msgid, tag.id as tagid
+**********
+select Message0.content, Tag0.name, Person0.lastName, Person0.firstName
+from neo4j,Message Message0, Tag Tag0, TagClass TagClass0, Person Person0
+where Person0.locationIP = $param and TagClass0.name = $param and neo4j.msgid = Message0.id and neo4j.tagid = Tag0.id and neo4j.tagClassid = TagClass0.id and neo4j.personid = Person0.id
+##########
+MATCH (p:Person3)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(msg:Message2)
+RETURN msg.id as msgid, p.id as pid, t.id as tid
+**********
+select Message0.content, Person0.lastName, Tag0.name, Person0.firstName
+from neo4j,Tag Tag0, Message Message0, Person Person0
+where Message0.length > $param and Person0.firstName = $param and neo4j.tid = Tag0.id and neo4j.msgid = Message0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(m:Message1)-[:REPLY_OF]->(c:Comment1)-[:HAS_CREATOR]->(p2:Person)
+
+RETURN t.id as tid, m.id as mid, c.id as cid, p2.id as p2id, p.id as pid
+**********
+select Person0.firstName, Person1.firstName, Comment0.content, Tag0.name, Message0.content, neo4j.pid
+from neo4j,Tag Tag0, Person Person0, Message Message0, Comment Comment0, Person Person1
+where Person1.firstName = $param and Message0.creationDate > $param and neo4j.tid = Tag0.id and neo4j.p2id = Person0.id and neo4j.mid = Message0.id and neo4j.cid = Comment0.id and neo4j.pid = Person1.id
+##########
+MATCH (p:Person)-[:KNOWS]->(p2:Person)-[:LIKES]->(c:Comment1)-[:REPLY_OF]->(post:Post2)
+
+RETURN post.id as postid, p2.id as p2id, c.id as cid, p.id as pid
+**********
+select Person0.firstName, Post0.content, Comment0.content, Person1.firstName
+from neo4j,Comment Comment0, Post Post0, Person Person0, Person Person1
+where Person0.browserUsed = $param and Person1.gender = $param and neo4j.cid = Comment0.id and neo4j.postid = Post0.id and neo4j.p2id = Person0.id and neo4j.pid = Person1.id
+##########
+MATCH (c:Comment1)-[:REPLY_OF]->(p:Post2)-[:HAS_CREATOR]->(author:Person1)<-[:KNOWS]-(friend:Person)
+
+RETURN friend.id as friendid, author.id as authorid, c.id as cid, p.id as pid
+**********
+select Person1.firstName, Person0.firstName, Post0.content, Comment0.content
+from neo4j,Comment Comment0, Person Person0, Post Post0, Person Person1
+where Post0.locationIP = $param and Comment0.browserUsed = $param and neo4j.cid = Comment0.id and neo4j.friendid = Person0.id and neo4j.pid = Post0.id and neo4j.authorid = Person1.id
+##########
+MATCH (c:Company)<-[:WORK_AT]-(p:Person1)-[:LIKES]->(msg:Message1)<-[:REPLY_OF]-(comment:Comment1)
+
+RETURN comment.id as commentid, c.id as cid
+**********
+select neo4j.commentid, Comment0.creationDate, Comment0.content
+from neo4j,Comment Comment0, Company Company0
+where Company0.name = $param and Comment0.length > $param and neo4j.commentid = Comment0.id and neo4j.cid = Company0.id
+##########
+MATCH (p1:Person1)-[:KNOWS]->(p2:Person1)-[:WORK_AT]->(c:Company)
+
+RETURN p1.id as p1id, p2.id as p2id, c.id as cid
+**********
+select Person0.firstName, Person1.firstName, Company0.name
+from neo4j,Person Person0, Company Company0, Person Person1
+where Person1.birthday > $param and Company0.name = $param and neo4j.p2id = Person0.id and neo4j.cid = Company0.id and neo4j.p1id = Person1.id
+##########
+MATCH (c:Comment2)-[:REPLY_OF]->(msg:Message1)<-[:CONTAINER_OF]-(f:Forum1)
+
+RETURN msg.id as msgid, c.id as cid, f.id as fid
+**********
+select Message0.content, Forum0.title, Comment0.content
+from neo4j,Message Message0, Forum Forum0, Comment Comment0
+where Forum0.title = $param and Comment0.locationIP = $param and neo4j.msgid = Message0.id and neo4j.fid = Forum0.id and neo4j.cid = Comment0.id
+##########
+MATCH (p:Person1)-[:WORK_AT]->(c:Company)-[:IS_LOCATED_IN]->(country:Country)
+RETURN c.id as cid, country.id as countryid, p.id as pid
+**********
+select Country0.name, Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Country Country0, Person Person0, Company Company0
+where Country0.name = $param and neo4j.countryid = Country0.id and neo4j.pid = Person0.id and neo4j.cid = Company0.id
+##########
+MATCH (p:Person)-[:STUDY_AT]->(u:University)-[:IS_LOCATED_IN]->(city:City)
+RETURN u.id as uid, p.id as pid, city.id as cityid
+**********
+select City0.name, University0.name, Person0.lastName, Person0.firstName
+from neo4j,Person Person0, University University0, City City0
+where City0.name = $param and neo4j.pid = Person0.id and neo4j.uid = University0.id and neo4j.cityid = City0.id
+##########
+MATCH (p:Person)-[:STUDY_AT]->(uni:University)-[:IS_LOCATED_IN]->(city:City)
+
+RETURN uni.id as uniid, p.id as pid, city.id as cityid
+**********
+select Person0.lastName, University0.name, Person0.firstName
+from neo4j,Person Person0, University University0, City City0
+where Person0.birthday > $param and City0.name = $param and neo4j.pid = Person0.id and neo4j.uniid = University0.id and neo4j.cityid = City0.id
+##########
+MATCH (f:Forum2)-[:HAS_MODERATOR]->(person:Person1)-[:KNOWS]->(friend:Person1)-[:LIKES]->(comment:Comment1)
+
+RETURN friend.id as friendid, person.id as personid, comment.id as commentid, f.id as fid
+**********
+select Forum0.title, Person1.firstName, Person0.firstName, Comment0.content
+from neo4j,Forum Forum0, Person Person0, Person Person1, Comment Comment0
+where Forum0.title = $param and Person0.birthday > date($param) and neo4j.fid = Forum0.id and neo4j.personid = Person0.id and neo4j.friendid = Person1.id and neo4j.commentid = Comment0.id
+##########
+MATCH (person:Person1)-[:STUDY_AT]->(university:University)-[:IS_LOCATED_IN]->(city:City)
+
+RETURN university.id as universityid, person.id as personid, city.id as cityid
+**********
+select City0.name, Person0.lastName, University0.name, Person0.firstName
+from neo4j,Person Person0, University University0, City City0
+where Person0.birthday < $param and City0.name = $param and neo4j.personid = Person0.id and neo4j.universityid = University0.id and neo4j.cityid = City0.id
+##########
+MATCH (org:Organisation)-[:IS_LOCATED_IN]->(place:Place)<-[:IS_LOCATED_IN]-(person:Person1)-[:KNOWS]->(friend:Person1)-[:WORK_AT]->(company:Company)
+
+RETURN friend.id as friendid, company.id as companyid, person.id as personid, org.id as orgid, place.id as placeid
+**********
+select Organisation0.name, Person0.lastName, Company0.name, Person0.firstName, Person1.lastName, Place0.name, Person1.firstName
+from neo4j,Company Company0, Person Person0, Person Person1, Place Place0, Organisation Organisation0
+where Company0.name = $param and Place0.name = $param and neo4j.companyid = Company0.id and neo4j.friendid = Person0.id and neo4j.personid = Person1.id and neo4j.placeid = Place0.id and neo4j.orgid = Organisation0.id
+##########
+MATCH (c:Comment1)-[:REPLY_OF]->(m:Message2)-[:HAS_CREATOR]->(p:Person1)
+
+RETURN c.id as cid, p.id as pid
+**********
+select Comment0.creationDate, Comment0.content, neo4j.cid
+from neo4j,Person Person0, Comment Comment0
+where Person0.email = $param and Comment0.creationDate > $param and neo4j.pid = Person0.id and neo4j.cid = Comment0.id
+##########
+MATCH (p:Person)-[:LIKES]->(c:Comment1)-[:HAS_CREATOR]->(creator:Person1)
+
+RETURN creator.id as creatorid, c.id as cid, p.id as pid
+**********
+select Person0.firstName, Comment0.content, Person1.firstName, Person1.lastName, Person0.lastName
+from neo4j,Person Person0, Comment Comment0, Person Person1
+where Person1.locationIP = $param and Person0.locationIP = $param and neo4j.creatorid = Person0.id and neo4j.cid = Comment0.id and neo4j.pid = Person1.id
+##########
+MATCH (f:Forum2)-[:CONTAINER_OF]->(m:Message1)-[:HAS_TAG]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN t.id as tid, tc.id as tcid, f.id as fid, m.id as mid
+**********
+select TagClass0.name, Forum0.title, Message0.content, Tag0.name
+from neo4j,Tag Tag0, TagClass TagClass0, Forum Forum0, Message Message0
+where TagClass0.name = $param and Forum0.creationDate > $param and neo4j.tid = Tag0.id and neo4j.tcid = TagClass0.id and neo4j.fid = Forum0.id and neo4j.mid = Message0.id
+##########
+MATCH (p:Person1)-[:IS_LOCATED_IN]->(city:City)-[:IS_PART_OF]->(country:Country)<-[:IS_LOCATED_IN]-(org:Organisation)
+
+RETURN org.id as orgid, country.id as countryid, p.id as pid, city.id as cityid
+**********
+select Organisation0.name, City0.name, neo4j.orgid, Person0.firstName, Country0.name, Person0.lastName, neo4j.pid
+from neo4j,Organisation Organisation0, City City0, Country Country0, Person Person0
+where Organisation0.name = $param and Person0.speaks = $param and neo4j.orgid = Organisation0.id and neo4j.cityid = City0.id and neo4j.countryid = Country0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person1)-[:LIKES]->(msg:Message1)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN tag.id as tagid, msg.id as msgid, tc.id as tcid, p.id as pid
+**********
+select Message0.content, Person0.firstName, Tag0.name, TagClass0.name, Person0.lastName, neo4j.pid
+from neo4j,Message Message0, Person Person0, TagClass TagClass0, Tag Tag0
+where Person0.birthday < date($param) and Message0.length > $param and neo4j.msgid = Message0.id and neo4j.pid = Person0.id and neo4j.tcid = TagClass0.id and neo4j.tagid = Tag0.id
+##########
+MATCH (p:Person1)-[:WORK_AT]->(c:Company)-[:IS_LOCATED_IN]->(country:Country)
+
+RETURN c.id as cid, country.id as countryid, p.id as pid
+**********
+select Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Country Country0, Company Company0, Person Person0
+where Person0.birthday < $param and Country0.name = $param and neo4j.countryid = Country0.id and neo4j.cid = Company0.id and neo4j.pid = Person0.id
+##########
+MATCH (p1:Person1)<-[:KNOWS]-(p2:Person)-[:STUDY_AT]->(u:University)-[:IS_LOCATED_IN]->(place:Place)
+
+RETURN place.id as placeid, p1.id as p1id, p2.id as p2id, u.id as uid
+**********
+select Person1.firstName, Person0.lastName, Person1.lastName, University0.name, Person0.firstName
+from neo4j,Person Person0, Person Person1, Place Place0, University University0
+where Place0.name = $param and Person0.gender = $param and neo4j.p1id = Person0.id and neo4j.p2id = Person1.id and neo4j.placeid = Place0.id and neo4j.uid = University0.id
+##########
+MATCH (message:Message2)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)<-[:IS_SUBCLASS_OF]-(parentTagClass:TagClass)
+RETURN message.id as messageid, tagClass.id as tagClassid, parentTagClass.id as parentTagClassid, tag.id as tagid
+**********
+select Tag0.name, Message0.content, TagClass1.name, TagClass0.name
+from neo4j,TagClass TagClass0, TagClass TagClass1, Message Message0, Tag Tag0
+where TagClass0.name = $param and neo4j.parentTagClassid = TagClass0.id and neo4j.tagClassid = TagClass1.id and neo4j.messageid = Message0.id and neo4j.tagid = Tag0.id
+##########
+MATCH (country:Country)<-[:IS_LOCATED_IN]-(organisation:Organisation)<-[:WORK_AT]-(person:Person1)-[:KNOWS]->(friend:Person)
+
+RETURN friend.id as friendid, person.id as personid, country.id as countryid, organisation.id as organisationid
+**********
+select Country0.name, Person0.firstName, Person0.lastName, Organisation0.name
+from neo4j,Organisation Organisation0, Person Person0, Country Country0, Person Person1
+where Person1.birthday < date($param) and Organisation0.name = $param and neo4j.organisationid = Organisation0.id and neo4j.personid = Person0.id and neo4j.countryid = Country0.id and neo4j.friendid = Person1.id
+##########
+MATCH (p:Person1)-[:LIKES]->(post:Post1)-[:HAS_CREATOR]->(author:Person)
+
+RETURN author.id as authorid, post.id as postid, p.id as pid
+**********
+select Person1.lastName, Person1.firstName, Person0.firstName, Person0.lastName, Post0.content
+from neo4j,Post Post0, Person Person0, Person Person1
+where Person0.gender = $param and neo4j.postid = Post0.id and neo4j.authorid = Person0.id and neo4j.pid = Person1.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(:Tag)-[:HAS_TYPE]->(tc:TagClass)-[:IS_SUBCLASS_OF]->(parent:TagClass)
+
+RETURN tc.id as tcid, parent.id as parentid, p.id as pid
+**********
+select TagClass1.name, Person0.lastName, TagClass0.name, Person0.firstName
+from neo4j,TagClass TagClass0, TagClass TagClass1, Person Person0
+where TagClass0.name = $param and neo4j.parentid = TagClass0.id and neo4j.tcid = TagClass1.id and neo4j.pid = Person0.id
+##########
+MATCH (c:Company)-[:IS_LOCATED_IN]->(place:Place)<-[:IS_LOCATED_IN]-(msg:Message2)
+
+RETURN place.id as placeid, msg.id as msgid, c.id as cid
+**********
+select Message0.content, Message0.creationDate, Place0.name
+from neo4j,Company Company0, Message Message0, Place Place0
+where Company0.name = $param and neo4j.cid = Company0.id and neo4j.msgid = Message0.id and neo4j.placeid = Place0.id
+##########
+MATCH (m:Message1)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tc:TagClass)-[:IS_SUBCLASS_OF]->(parent:TagClass)
+WHERE parent.id = $param
+RETURN tc.id as tcid, parent.id as parentid, tag.id as tagid, m.id as mid
+**********
+select TagClass0.name, Tag0.name, Message0.content, TagClass1.name
+from neo4j,Message Message0, TagClass TagClass0, Tag Tag0, TagClass TagClass1
+where TagClass0.name = $param and neo4j.mid = Message0.id and neo4j.tcid = TagClass0.id and neo4j.tagid = Tag0.id and neo4j.parentid = TagClass1.id
+##########
+MATCH (m:Message1)-[:HAS_TAG]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN t.id as tid, tc.id as tcid, m.id as mid
+**********
+select Message0.content, Message0.creationDate, Tag0.name
+from neo4j,TagClass TagClass0, Tag Tag0, Message Message0
+where TagClass0.name = $param and neo4j.tcid = TagClass0.id and neo4j.tid = Tag0.id and neo4j.mid = Message0.id
+##########
+MATCH (p:Person1)-[:STUDY_AT]->(u:University)-[:IS_LOCATED_IN]->(c:City)
+
+RETURN u.id as uid, c.id as cid, p.id as pid
+**********
+select University0.name, Person0.lastName, City0.name, Person0.firstName
+from neo4j,University University0, Person Person0, City City0
+where Person0.speaks CONTAINS $param and City0.name = $param and neo4j.uid = University0.id and neo4j.pid = Person0.id and neo4j.cid = City0.id
+##########
+MATCH (msg:Message1)-[:HAS_TAG]->(tag:Tag)<-[:HAS_TAG]-(relatedMsg:Message2)<-[:REPLY_OF]-(cmt:Comment1)
+
+RETURN msg.id as msgid, cmt.id as cmtid, relatedMsg.id as relatedMsgid, tag.id as tagid
+**********
+select Message0.content, Tag0.name, Comment0.content, neo4j.msgid
+from neo4j,Message Message0, Tag Tag0, Comment Comment0, Message Message1
+where Message1.creationDate > $param and neo4j.relatedMsgid = Message0.id and neo4j.tagid = Tag0.id and neo4j.cmtid = Comment0.id and neo4j.msgid = Message1.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(:Tag)-[:HAS_TYPE]->(tc:TagClass)-[:IS_SUBCLASS_OF]->(gv:TagClass)
+
+RETURN gv.id as gvid, tc.id as tcid, p.id as pid
+**********
+select TagClass0.name, Person0.lastName, Person0.firstName
+from neo4j,Person Person0, TagClass TagClass0, TagClass TagClass1
+where TagClass1.name = $param and Person0.birthday > datetime($param) and neo4j.pid = Person0.id and neo4j.tcid = TagClass0.id and neo4j.gvid = TagClass1.id
+##########
+MATCH (country:Country)<-[:IS_PART_OF]-(place:Place)<-[:IS_LOCATED_IN]-(msg:Message2)<-[:CONTAINER_OF]-(forum:Forum1)
+
+RETURN place.id as placeid, msg.id as msgid, forum.id as forumid, country.id as countryid
+**********
+select Message0.content, Forum0.title, Place0.name, Forum0.creationDate
+from neo4j,Message Message0, Place Place0, Country Country0, Forum Forum0
+where Forum0.creationDate < $param and Country0.name = $param and neo4j.msgid = Message0.id and neo4j.placeid = Place0.id and neo4j.countryid = Country0.id and neo4j.forumid = Forum0.id
+##########
+MATCH (univ:University)<-[:STUDY_AT]-(student:Person)-[:KNOWS]->(friend:Person)-[:LIKES]->(msg:Message2)
+
+RETURN student.id as studentid, friend.id as friendid, univ.id as univid, msg.id as msgid
+**********
+select Person0.lastName, Message0.content, Person0.firstName, Person1.lastName, Person1.firstName
+from neo4j,Person Person0, University University0, Person Person1, Message Message0
+where Message0.length > $param and University0.name = $param and neo4j.studentid = Person0.id and neo4j.univid = University0.id and neo4j.friendid = Person1.id and neo4j.msgid = Message0.id
+##########
+MATCH (c:Comment2)-[:HAS_CREATOR]->(p:Person)-[:LIKES]->(m:Message2)-[:HAS_TAG]->(t:Tag)
+
+RETURN m.id as mid, c.id as cid, p.id as pid, t.id as tid
+**********
+select Person0.firstName, Message0.content, Tag0.name, Comment0.content
+from neo4j,Tag Tag0, Person Person0, Message Message0, Comment Comment0
+where Tag0.name = $param and Comment0.creationDate < $param and neo4j.tid = Tag0.id and neo4j.pid = Person0.id and neo4j.mid = Message0.id and neo4j.cid = Comment0.id
+##########
+MATCH (p:Person1)-[:WORK_AT]->(c:Company)-[:IS_LOCATED_IN]->(pl:Place)-[:IS_PART_OF]->(co:Country)
+
+RETURN pl.id as plid, c.id as cid, p.id as pid, co.id as coid
+**********
+select Place0.name, Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Place Place0, Company Company0, Person Person0, Country Country0
+where Country0.name = $param and Person0.speaks = $param and neo4j.plid = Place0.id and neo4j.cid = Company0.id and neo4j.pid = Person0.id and neo4j.coid = Country0.id
+##########
+MATCH (p:Person1)-[:LIKES]->(c:Comment2)-[:REPLY_OF]->(m:Message2)
+
+RETURN c.id as cid, p.id as pid, m.id as mid
+**********
+select neo4j.cid, neo4j.mid, Person0.lastName, Person0.firstName
+from neo4j,Message Message0, Person Person0
+where Message0.length < $param and Person0.email = $param and neo4j.mid = Message0.id and neo4j.pid = Person0.id
+##########
+MATCH (m:Message1)-[:REPLY_OF]->(po:Post1)-[:HAS_CREATOR]->(p:Person1)
+
+RETURN po.id as poid, p.id as pid, m.id as mid
+**********
+select neo4j.mid, Person0.lastName, neo4j.poid, Person0.firstName
+from neo4j,Person Person0, Message Message0
+where Person0.locationIP = $param and Message0.length > $param and neo4j.pid = Person0.id and neo4j.mid = Message0.id
+##########
+MATCH (comment:Comment2)-[:REPLY_OF]->(msg:Message1)-[:HAS_TAG]->(tag:Tag)
+
+RETURN comment.id as commentid, msg.id as msgid, tag.id as tagid
+**********
+select Message0.content, Tag0.name, Comment0.content
+from neo4j,Message Message0, Comment Comment0, Tag Tag0
+where Comment0.creationDate > $param and Message0.browserUsed = $param and neo4j.msgid = Message0.id and neo4j.commentid = Comment0.id and neo4j.tagid = Tag0.id
+##########
+MATCH (msg:Message1)-[:HAS_CREATOR]->(creator:Person)-[:STUDY_AT]->(uni:University)-[:IS_LOCATED_IN]->(place:Place)
+
+RETURN uni.id as uniid, place.id as placeid, creator.id as creatorid, msg.id as msgid
+**********
+select University0.name, Person0.firstName, Message0.content, Place0.name, Person0.lastName
+from neo4j,Message Message0, Place Place0, Person Person0, University University0
+where Message0.length > $param and Place0.name = $param and neo4j.msgid = Message0.id and neo4j.placeid = Place0.id and neo4j.creatorid = Person0.id and neo4j.uniid = University0.id
+##########
+MATCH (person:Person)-[:WORK_AT]->(company:Company)-[:IS_LOCATED_IN]->(country:Country)
+
+RETURN company.id as companyid, person.id as personid, country.id as countryid
+**********
+select Country0.name, Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Country Country0, Company Company0, Person Person0
+where Country0.name = $param and Person0.gender = $param and neo4j.countryid = Country0.id and neo4j.companyid = Company0.id and neo4j.personid = Person0.id
+##########
+MATCH (comment:Comment2)-[:REPLY_OF]->(msg:Message2)-[:HAS_CREATOR]->(creator:Person1)
+
+RETURN creator.id as creatorid, comment.id as commentid
+**********
+select neo4j.commentid, Person0.lastName, Person0.firstName, Comment0.content
+from neo4j,Person Person0, Comment Comment0
+where Person0.gender = $param and Comment0.length > $param and neo4j.creatorid = Person0.id and neo4j.commentid = Comment0.id
+##########
+MATCH (t:Tag)<-[:HAS_TAG]-(post:Post1)<-[:CONTAINER_OF]-(forum:Forum)-[:HAS_MODERATOR]->(moderator:Person1)
+
+RETURN moderator.id as moderatorid, post.id as postid, forum.id as forumid, t.id as tid
+**********
+select Post0.content, Person0.firstName, Tag0.name, Person0.lastName
+from neo4j,Tag Tag0, Forum Forum0, Post Post0, Person Person0
+where Tag0.name = $param and Forum0.creationDate < $param and neo4j.tid = Tag0.id and neo4j.forumid = Forum0.id and neo4j.postid = Post0.id and neo4j.moderatorid = Person0.id
+##########
+MATCH (p:Person)-[:WORK_AT]->(company:Company)-[:IS_LOCATED_IN]->(country:Country)
+
+RETURN company.id as companyid, country.id as countryid, p.id as pid
+**********
+select Country0.name, Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Country Country0, Company Company0, Person Person0
+where Person0.birthday < $param and Country0.name = $param and neo4j.countryid = Country0.id and neo4j.companyid = Company0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person1)-[:KNOWS]->(friend:Person1)-[:LIKES]->(post:Post2)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)
+
+RETURN tagClass.id as tagClassid, post.id as postid, p.id as pid
+**********
+select Post0.content, Person0.lastName, Person0.firstName
+from neo4j,TagClass TagClass0, Person Person0, Post Post0
+where TagClass0.name = $param and Person0.birthday > $param and Person0.gender = $param and neo4j.tagClassid = TagClass0.id and neo4j.pid = Person0.id and neo4j.postid = Post0.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN tc.id as tcid, p.id as pid, t.id as tid
+**********
+select TagClass0.name, Person0.lastName, Tag0.name, Person0.firstName
+from neo4j,Tag Tag0, Person Person0, TagClass TagClass0
+where TagClass0.name = $param and Person0.gender = $param and neo4j.tid = Tag0.id and neo4j.pid = Person0.id and neo4j.tcid = TagClass0.id
+##########
+MATCH (p:Person1)-[:LIKES]->(post:Post1)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN tag.id as tagid, post.id as postid, tc.id as tcid, p.id as pid
+**********
+select Person0.lastName, Person0.firstName, Tag0.name, TagClass0.name, Post0.content
+from neo4j,TagClass TagClass0, Post Post0, Person Person0, Tag Tag0
+where TagClass0.name = $param and neo4j.tcid = TagClass0.id and neo4j.postid = Post0.id and neo4j.pid = Person0.id and neo4j.tagid = Tag0.id
+##########
+MATCH (person:Person)-[:WORK_AT]->(company:Company)-[:IS_LOCATED_IN]->(country:Country)
+
+RETURN person.id as personid, country.id as countryid
+**********
+select Person0.lastName, neo4j.personid, Person0.firstName
+from neo4j,Person Person0, Country Country0
+where Country0.name = $param and Person0.gender = $param and neo4j.personid = Person0.id and neo4j.countryid = Country0.id
+##########
+MATCH (p:Person2)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(m:Message2)-[:HAS_CREATOR]->(f:Person1)
+RETURN t.id as tid, p.id as pid, f.id as fid, m.id as mid
+**********
+select Person1.firstName, Person1.lastName, Person0.firstName, Tag0.name, Message0.content, Person0.lastName
+from neo4j,Person Person0, Message Message0, Tag Tag0, Person Person1
+where Person1.email = $param and Message0.locationIP = $param and neo4j.pid = Person0.id and neo4j.mid = Message0.id and neo4j.tid = Tag0.id and neo4j.fid = Person1.id
+##########
+MATCH (p:Person)-[:LIKES]->(po:Post1)-[:HAS_CREATOR]->(f:Person1)-[:WORK_AT]->(o:Organisation)
+
+RETURN o.id as oid, po.id as poid, p.id as pid, f.id as fid
+**********
+select Person0.firstName, Organisation0.name, Person0.lastName, Person1.firstName, Post0.content, Person1.lastName
+from neo4j,Post Post0, Person Person0, Person Person1, Organisation Organisation0
+where Person1.birthday < $param and Organisation0.name = $param and neo4j.poid = Post0.id and neo4j.fid = Person0.id and neo4j.pid = Person1.id and neo4j.oid = Organisation0.id
+##########
+MATCH (org:Organisation)<-[:WORK_AT]-(p:Person1)-[:KNOWS]->(friend:Person)-[:LIKES]->(msg:Message1)
+
+RETURN friend.id as friendid, org.id as orgid, msg.id as msgid, p.id as pid
+**********
+select Organisation0.name, Message0.content, neo4j.orgid, Person0.firstName, Person1.firstName, neo4j.friendid, neo4j.pid
+from neo4j,Person Person0, Person Person1, Organisation Organisation0, Message Message0
+where Message0.creationDate < $param and Organisation0.name = $param and neo4j.pid = Person0.id and neo4j.friendid = Person1.id and neo4j.orgid = Organisation0.id and neo4j.msgid = Message0.id
+##########
+MATCH (p:Person1)-[:KNOWS]->(friend:Person1)-[:LIKES]->(message:Message1)
+
+RETURN message.id as messageid, p.id as pid
+**********
+select Message0.content, Person0.lastName, Person0.firstName
+from neo4j,Message Message0, Person Person0
+where Person0.locationIP = $param and Message0.creationDate > $param and neo4j.messageid = Message0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person1)-[:KNOWS]->(friend:Person1)-[:HAS_INTEREST]->(tag:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN friend.id as friendid, tag.id as tagid, tc.id as tcid, p.id as pid
+**********
+select Person0.lastName, Person1.firstName, Tag0.name, Person0.firstName, TagClass0.name, Person1.lastName
+from neo4j,Person Person0, TagClass TagClass0, Tag Tag0, Person Person1
+where TagClass0.name = $param and Person1.browserUsed = $param and neo4j.friendid = Person0.id and neo4j.tcid = TagClass0.id and neo4j.tagid = Tag0.id and neo4j.pid = Person1.id
+##########
+MATCH (org:Organisation)-[:IS_LOCATED_IN]->(city:City)<-[:IS_LOCATED_IN]-(person:Person1)
+
+RETURN person.id as personid, org.id as orgid, city.id as cityid
+**********
+select Organisation0.name, City0.name, Person0.lastName, Person0.firstName
+from neo4j,Person Person0, City City0, Organisation Organisation0
+where Organisation0.name = $param and City0.name = $param and Person0.gender = $param and neo4j.personid = Person0.id and neo4j.cityid = City0.id and neo4j.orgid = Organisation0.id
+##########
+MATCH (p:Person)-[:STUDY_AT]->(uni:University)-[:IS_LOCATED_IN]->(city:City)
+
+RETURN uni.id as uniid, p.id as pid, city.id as cityid
+**********
+select City0.name, University0.name, neo4j.uniid, Person0.firstName, neo4j.cityid, neo4j.pid
+from neo4j,University University0, Person Person0, City City0
+where City0.name = $param and Person0.speaks = $param and neo4j.uniid = University0.id and neo4j.pid = Person0.id and neo4j.cityid = City0.id
+##########
+MATCH (cmt:Comment1)-[:REPLY_OF]->(msg:Message2)-[:HAS_CREATOR]->(creator:Person1)
+
+RETURN creator.id as creatorid, msg.id as msgid, cmt.id as cmtid
+**********
+select neo4j.creatorid, Person0.firstName, Message0.content, neo4j.cmtid, Comment0.content, neo4j.msgid
+from neo4j,Comment Comment0, Message Message0, Person Person0
+where Person0.speaks = $param and Comment0.creationDate < $param and neo4j.cmtid = Comment0.id and neo4j.msgid = Message0.id and neo4j.creatorid = Person0.id
+##########
+MATCH (p:Person)<-[:HAS_CREATOR]-(msg:Message1)-[:REPLY_OF]->(post:Post2)-[:HAS_TAG]->(tag:Tag)
+
+RETURN tag.id as tagid, post.id as postid, msg.id as msgid, p.id as pid
+**********
+select Message0.content, Person0.lastName, Person0.firstName, Tag0.name, Post0.content
+from neo4j,Message Message0, Person Person0, Post Post0, Tag Tag0
+where Message0.length > $param and Tag0.name = $param and neo4j.msgid = Message0.id and neo4j.pid = Person0.id and neo4j.postid = Post0.id and neo4j.tagid = Tag0.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(m:Message2)-[:HAS_CREATOR]->(creator:Person1)
+RETURN m.id as mid, creator.id as creatorid, p.id as pid
+**********
+select Person0.firstName, Person1.firstName, Message0.content, Person1.lastName, Person0.lastName
+from neo4j,Person Person0, Message Message0, Person Person1
+where Person0.gender = $param and Message0.creationDate > $param and neo4j.creatorid = Person0.id and neo4j.mid = Message0.id and neo4j.pid = Person1.id
+##########
+MATCH (p1:Person)-[:KNOWS]->(p2:Person)-[:LIKES]->(msg:Message1)-[:HAS_CREATOR]->(p3:Person1)
+
+RETURN p3.id as p3id, p1.id as p1id, p2.id as p2id, msg.id as msgid
+**********
+select Person2.firstName, Person1.lastName, Message0.content, Person0.firstName, Person0.lastName, Person2.lastName, Person1.firstName
+from neo4j,Person Person0, Person Person1, Person Person2, Message Message0
+where Message0.creationDate > $param and Person1.birthday < $param and neo4j.p3id = Person0.id and neo4j.p1id = Person1.id and neo4j.p2id = Person2.id and neo4j.msgid = Message0.id
+##########
+MATCH (p:Person1)-[:STUDY_AT]->(u:University)-[:IS_LOCATED_IN]->(c:City), (p)-[:HAS_INTEREST]->(t:Tag)
+RETURN u.id as uid, c.id as cid, p.id as pid, t.id as tid
+**********
+select University0.name, Person0.lastName, Tag0.name, Person0.firstName
+from neo4j,City City0, Tag Tag0, University University0, Person Person0
+where City0.name = $param and neo4j.cid = City0.id and neo4j.tid = Tag0.id and neo4j.uid = University0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(tag:Tag)-[:HAS_TYPE]->(tc:TagClass)-[:IS_SUBCLASS_OF]->(parentTC:TagClass)
+RETURN tag.id as tagid, tc.id as tcid, parentTC.id as parentTCid, p.id as pid
+**********
+select TagClass1.name, Person0.firstName, Tag0.name, TagClass0.name, Person0.lastName
+from neo4j,TagClass TagClass0, Tag Tag0, TagClass TagClass1, Person Person0
+where TagClass1.name = $param and neo4j.tcid = TagClass0.id and neo4j.tagid = Tag0.id and neo4j.parentTCid = TagClass1.id and neo4j.pid = Person0.id
+##########
+MATCH (u:University)<-[:STUDY_AT]-(p:Person)-[:KNOWS]->(friend:Person)-[:WORK_AT]->(c:Company)
+
+RETURN friend.id as friendid, u.id as uid, c.id as cid, p.id as pid
+**********
+select neo4j.cid, Person0.firstName, Person1.firstName
+from neo4j,Person Person0, University University0, Person Person1, Company Company0
+where Company0.name = $param and University0.name = $param and neo4j.friendid = Person0.id and neo4j.uid = University0.id and neo4j.pid = Person1.id and neo4j.cid = Company0.id
+##########
+MATCH (msg:Message1)-[:HAS_CREATOR]->(p:Person)-[:WORK_AT]->(comp:Company)-[:IS_LOCATED_IN]->(place:Place)
+
+RETURN place.id as placeid, msg.id as msgid, p.id as pid, comp.id as compid
+**********
+select Message0.content, Person0.firstName, Place0.name, Person0.lastName, Company0.name
+from neo4j,Company Company0, Place Place0, Person Person0, Message Message0
+where Company0.name = $param and Place0.name = $param and neo4j.compid = Company0.id and neo4j.placeid = Place0.id and neo4j.pid = Person0.id and neo4j.msgid = Message0.id
+##########
+MATCH (f:Forum)-[:CONTAINER_OF]->(post:Post2)<-[:REPLY_OF]-(c:Comment1)-[:HAS_CREATOR]->(person:Person)
+
+RETURN person.id as personid, post.id as postid, c.id as cid, f.id as fid
+**********
+select Comment0.content, Person0.lastName, Person0.firstName, Forum0.title, Post0.content
+from neo4j,Forum Forum0, Post Post0, Person Person0, Comment Comment0
+where Forum0.title = $param and Person0.gender = $param and neo4j.fid = Forum0.id and neo4j.postid = Post0.id and neo4j.personid = Person0.id and neo4j.cid = Comment0.id
+##########
+MATCH (tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)-[:IS_SUBCLASS_OF]->(superClass:TagClass)
+
+RETURN superClass.id as superClassid, tagClass.id as tagClassid, tag.id as tagid
+**********
+select TagClass1.name, TagClass0.name
+from neo4j,TagClass TagClass0, Tag Tag0, TagClass TagClass1
+where TagClass0.name = $param and Tag0.name = $param and neo4j.superClassid = TagClass0.id and neo4j.tagid = Tag0.id and neo4j.tagClassid = TagClass1.id
+##########
+MATCH (p:Person)-[:HAS_INTEREST]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)-[:IS_SUBCLASS_OF]->(parentTC:TagClass)
+
+RETURN t.id as tid, parentTC.id as parentTCid, tc.id as tcid, p.id as pid
+**********
+select Person0.firstName, Tag0.name, TagClass1.name, Person0.lastName, neo4j.pid
+from neo4j,Person Person0, TagClass TagClass0, TagClass TagClass1, Tag Tag0
+where Person0.birthday < date($param) and TagClass0.name = $param and neo4j.pid = Person0.id and neo4j.parentTCid = TagClass0.id and neo4j.tcid = TagClass1.id and neo4j.tid = Tag0.id
+##########
+MATCH (p:Person)-[:WORK_AT]->(comp:Company)-[:IS_LOCATED_IN]->(country:Country)
+
+RETURN country.id as countryid, p.id as pid, comp.id as compid
+**********
+select Country0.name, Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Person Person0, Country Country0, Company Company0
+where Company0.name = $param and Country0.name = $param and neo4j.pid = Person0.id and neo4j.countryid = Country0.id and neo4j.compid = Company0.id
+##########
+MATCH (f:Forum2)-[:CONTAINER_OF]->(m:Message2)-[:REPLY_OF]->(c:Comment1)-[:HAS_CREATOR]->(p:Person1)
+
+RETURN c.id as cid, p.id as pid, f.id as fid, m.id as mid
+**********
+select Forum0.title, Person0.lastName, Comment0.content, Person0.firstName
+from neo4j,Message Message0, Comment Comment0, Forum Forum0, Person Person0
+where Forum0.title = $param and Message0.creationDate < $param and neo4j.mid = Message0.id and neo4j.cid = Comment0.id and neo4j.fid = Forum0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person)-[:STUDY_AT]->(u:University)-[:IS_LOCATED_IN]->(place:Place)<-[:IS_LOCATED_IN]-(m:Message1)
+
+RETURN place.id as placeid, u.id as uid, p.id as pid, m.id as mid
+**********
+select Person0.firstName, University0.name, Place0.name, Message0.content, Person0.lastName
+from neo4j,Message Message0, Place Place0, Person Person0, University University0
+where Person0.speaks CONTAINS $param and Message0.creationDate > $param and neo4j.mid = Message0.id and neo4j.placeid = Place0.id and neo4j.pid = Person0.id and neo4j.uid = University0.id
+##########
+MATCH (p:Person1)-[:KNOWS]->(p2:Person)-[:WORK_AT]->(o:Organisation)
+
+RETURN o.id as oid, p2.id as p2id, p.id as pid
+**********
+select Person1.firstName, Organisation0.name, Person1.lastName, Person0.firstName, neo4j.p2id, Person0.lastName, neo4j.pid
+from neo4j,Person Person0, Person Person1, Organisation Organisation0
+where Organisation0.name = $param and Person0.speaks = $param and neo4j.pid = Person0.id and neo4j.p2id = Person1.id and neo4j.oid = Organisation0.id
+##########
+MATCH (p:Person)-[:KNOWS]->(friend:Person)-[:LIKES]->(msg:Message2)-[:REPLY_OF]->(original:Post1)
+
+RETURN friend.id as friendid, msg.id as msgid, original.id as originalid, p.id as pid
+**********
+select Message0.content, Person0.lastName, Person1.firstName, Person0.firstName, Person1.lastName
+from neo4j,Person Person0, Message Message0, Post Post0, Person Person1
+where Post0.creationDate < $param and Person0.gender = $param and neo4j.friendid = Person0.id and neo4j.msgid = Message0.id and neo4j.originalid = Post0.id and neo4j.pid = Person1.id
+##########
+MATCH (forum:Forum2)-[:CONTAINER_OF]->(message:Message2)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)
+
+RETURN message.id as messageid, tagClass.id as tagClassid, forum.id as forumid
+**********
+select Forum0.title, neo4j.forumid, Message0.content
+from neo4j,Message Message0, TagClass TagClass0, Forum Forum0
+where Forum0.title =~ $param and TagClass0.name = $param and neo4j.messageid = Message0.id and neo4j.tagClassid = TagClass0.id and neo4j.forumid = Forum0.id
+##########
+MATCH (comment:Comment2)-[:REPLY_OF]->(post:Post2)<-[:CONTAINER_OF]-(forum:Forum1)-[:HAS_MEMBER]->(member:Person1)
+
+RETURN member.id as memberid, forum.id as forumid, comment.id as commentid, post.id as postid
+**********
+select Person0.lastName, Person0.firstName, Post0.content, Comment0.content
+from neo4j,Post Post0, Comment Comment0, Forum Forum0, Person Person0
+where Comment0.creationDate > $param and Forum0.title = $param and neo4j.postid = Post0.id and neo4j.commentid = Comment0.id and neo4j.forumid = Forum0.id and neo4j.memberid = Person0.id
+##########
+MATCH (person:Person1)-[:HAS_INTEREST]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)<-[:IS_SUBCLASS_OF]-(parentTagClass:TagClass)
+
+RETURN tagClass.id as tagClassid, person.id as personid, parentTagClass.id as parentTagClassid, tag.id as tagid
+**********
+select Tag0.name, TagClass0.name, Person0.lastName, Person0.firstName
+from neo4j,TagClass TagClass0, Tag Tag0, Person Person0, TagClass TagClass1
+where TagClass1.name = $param and Person0.locationIP = $param and neo4j.tagClassid = TagClass0.id and neo4j.tagid = Tag0.id and neo4j.personid = Person0.id and neo4j.parentTagClassid = TagClass1.id
+##########
+MATCH (p:Person1)-[:KNOWS]->(friend:Person1)-[:WORK_AT]->(company:Company)-[:IS_LOCATED_IN]->(place:Place)<-[:IS_PART_OF]-(country:Country)
+
+RETURN friend.id as friendid, company.id as companyid, place.id as placeid, country.id as countryid, p.id as pid
+**********
+select Company0.name, Person0.lastName, Person1.firstName, Person0.firstName, Place0.name, Person1.lastName
+from neo4j,Place Place0, Person Person0, Company Company0, Country Country0, Person Person1
+where Person1.email = $param and Country0.name = $param and neo4j.placeid = Place0.id and neo4j.friendid = Person0.id and neo4j.companyid = Company0.id and neo4j.countryid = Country0.id and neo4j.pid = Person1.id
+##########
+MATCH (company:Company)<-[:WORK_AT]-(person:Person)-[:KNOWS]->(friend:Person1)-[:LIKES]->(post:Post2)-[:HAS_TAG]->(tag:Tag)
+
+RETURN friend.id as friendid, company.id as companyid, tag.id as tagid, person.id as personid, post.id as postid
+**********
+select Person0.lastName, Person0.firstName, Person1.lastName, Person1.firstName, Post0.content
+from neo4j,Tag Tag0, Post Post0, Company Company0, Person Person0, Person Person1
+where Company0.name = $param and Tag0.name = $param and neo4j.tagid = Tag0.id and neo4j.postid = Post0.id and neo4j.companyid = Company0.id and neo4j.friendid = Person0.id and neo4j.personid = Person1.id
+##########
+MATCH (comment:Comment2)-[:REPLY_OF]->(post:Post2)-[:HAS_TAG]->(tag:Tag)<-[:HAS_INTEREST]-(interestedPerson:Person)
+
+RETURN tag.id as tagid, comment.id as commentid, post.id as postid, interestedPerson.id as interestedPersonid
+**********
+select Tag0.name, Person0.firstName, Post0.content, Comment0.content
+from neo4j,Tag Tag0, Post Post0, Person Person0, Comment Comment0
+where Comment0.browserUsed = $param and Person0.birthday > $param and neo4j.tagid = Tag0.id and neo4j.postid = Post0.id and neo4j.interestedPersonid = Person0.id and neo4j.commentid = Comment0.id
+##########
+MATCH (p:Person1)-[:LIKES]->(msg:Message1)-[:IS_LOCATED_IN]->(place:Place)<-[:IS_PART_OF]-(country:Country)
+
+RETURN place.id as placeid, msg.id as msgid, country.id as countryid, p.id as pid
+**********
+select Message0.content, Country0.name, Place0.name, Person0.firstName
+from neo4j,Message Message0, Country Country0, Place Place0, Person Person0
+where Person0.locationIP = $param and Country0.name = $param and neo4j.msgid = Message0.id and neo4j.countryid = Country0.id and neo4j.placeid = Place0.id and neo4j.pid = Person0.id
+##########
+MATCH (c:Comment1)-[:REPLY_OF]->(m:Message1)-[:HAS_CREATOR]->(p:Person1)
+
+RETURN c.id as cid, p.id as pid, m.id as mid
+**********
+select Person0.firstName, Message0.content, Person0.lastName, Comment0.content
+from neo4j,Person Person0, Comment Comment0, Message Message0
+where Comment0.creationDate > $param and Person0.gender = $param and neo4j.pid = Person0.id and neo4j.cid = Comment0.id and neo4j.mid = Message0.id
+##########
+MATCH (f:Forum1)-[:HAS_TAG]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN tc.id as tcid, f.id as fid, t.id as tid
+**********
+select TagClass0.name, Forum0.title, Forum0.creationDate, Tag0.name
+from neo4j,Forum Forum0, Tag Tag0, TagClass TagClass0
+where TagClass0.name = $param and Forum0.creationDate < $param and neo4j.fid = Forum0.id and neo4j.tid = Tag0.id and neo4j.tcid = TagClass0.id
+##########
+MATCH (p:Person)-[:LIKES]->(c:Comment1)-[:REPLY_OF]->(post:Post1)
+
+RETURN post.id as postid, c.id as cid, p.id as pid
+**********
+select Post0.creationDate, Person0.lastName, Comment0.content, Person0.firstName, Post0.content
+from neo4j,Comment Comment0, Person Person0, Post Post0
+where Person0.locationIP = $param and Post0.creationDate > $param and neo4j.cid = Comment0.id and neo4j.pid = Person0.id and neo4j.postid = Post0.id
+##########
+MATCH (f:Forum1)-[:HAS_MEMBER]->(p:Person3)-[:WORK_AT]->(c:Company)
+RETURN c.id as cid, p.id as pid, f.id as fid
+**********
+select Company0.name, Person0.firstName, neo4j.fid, Forum0.title, neo4j.pid
+from neo4j,Forum Forum0, Person Person0, Company Company0
+where Forum0.title = $param and Company0.name = $param and neo4j.fid = Forum0.id and neo4j.pid = Person0.id and neo4j.cid = Company0.id
+##########
+MATCH (p:Person1)-[:HAS_INTEREST]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)<-[:IS_SUBCLASS_OF]-(parent:TagClass)
+
+RETURN tc.id as tcid, parent.id as parentid, p.id as pid, t.id as tid
+**********
+select TagClass0.name, Person0.firstName, Tag0.name, TagClass1.name, Person0.lastName
+from neo4j,Tag Tag0, TagClass TagClass0, Person Person0, TagClass TagClass1
+where TagClass1.name = $param and neo4j.tid = Tag0.id and neo4j.parentid = TagClass0.id and neo4j.pid = Person0.id and neo4j.tcid = TagClass1.id
+##########
+MATCH (f:Forum2)-[:HAS_MEMBER]->(p:Person2)-[:HAS_INTEREST]->(t:Tag)
+RETURN p.id as pid, f.id as fid, t.id as tid
+**********
+select Person0.lastName, Tag0.name, Person0.firstName
+from neo4j,Tag Tag0, Forum Forum0, Person Person0
+where Forum0.title = $param and neo4j.tid = Tag0.id and neo4j.fid = Forum0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person2)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(m:Message3)-[:HAS_CREATOR]->(creator:Person1)
+
+RETURN t.id as tid, m.id as mid, creator.id as creatorid, p.id as pid
+**********
+select Person1.firstName, Person0.firstName, Tag0.name, neo4j.mid, Person0.lastName, Person1.lastName
+from neo4j,Person Person0, Person Person1, Tag Tag0
+where Person0.locationIP = $param and Person1.gender = $param and neo4j.pid = Person0.id and neo4j.creatorid = Person1.id and neo4j.tid = Tag0.id
+##########
+MATCH (p:Person2)<-[:KNOWS]-(friend:Person1)<-[:HAS_CREATOR]-(m:Message3)-[:HAS_TAG]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN friend.id as friendid, t.id as tid, tc.id as tcid, p.id as pid, m.id as mid
+**********
+select neo4j.friendid, neo4j.pid, neo4j.mid, neo4j.tid, neo4j.tcid
+from neo4j,Person Person0, TagClass TagClass0
+where Person0.firstName = $param and TagClass0.name = $param and neo4j.pid = Person0.id and neo4j.tcid = TagClass0.id
+##########
+MATCH (org:Organisation)<-[:WORK_AT]-(p:Person1)-[:KNOWS]->(friend:Person2)-[:LIKES]->(msg:Message3)
+
+RETURN friend.id as friendid, org.id as orgid, msg.id as msgid, p.id as pid
+**********
+select Organisation0.name, Message0.content, neo4j.orgid, Person0.firstName, Person1.firstName, neo4j.friendid, neo4j.pid
+from neo4j,Person Person0, Person Person1, Organisation Organisation0, Message Message0
+where Message0.creationDate < $param and Organisation0.name = $param and neo4j.pid = Person0.id and neo4j.friendid = Person1.id and neo4j.orgid = Organisation0.id and neo4j.msgid = Message0.id
+##########
+MATCH (msg:Message3)-[:HAS_TAG]->(tag:Tag)<-[:HAS_TAG]-(forum:Forum1)-[:HAS_MODERATOR]->(mod:Person2)
+
+RETURN mod.id as modid, forum.id as forumid, msg.id as msgid, tag.id as tagid
+**********
+select Person0.lastName, Message0.content, Forum0.title, neo4j.modid, Person0.firstName, neo4j.msgid
+from neo4j,Forum Forum0, Tag Tag0, Person Person0, Message Message0
+where Message0.browserUsed = $param and Tag0.name = $param and neo4j.forumid = Forum0.id and neo4j.tagid = Tag0.id and neo4j.modid = Person0.id and neo4j.msgid = Message0.id
+##########
+MATCH (p1:Person2)-[:KNOWS]->(p2:Person1)-[:WORK_AT]->(c:Company)-[:IS_LOCATED_IN]->(co:Country)
+
+RETURN p1.id as p1id, c.id as cid, co.id as coid
+**********
+select Company0.name, neo4j.cid
+from neo4j,Company Company0, Country Country0, Person Person0
+where Country0.name = $param and Person0.locationIP = $param and neo4j.cid = Company0.id and neo4j.coid = Country0.id and neo4j.p1id = Person0.id
+##########
+MATCH (p:Person3)-[:LIKES]->(msg:Message3)-[:HAS_TAG]->(t:Tag)<-[:HAS_TAG]-(forum:Forum1)
+
+RETURN msg.id as msgid, forum.id as forumid, p.id as pid, t.id as tid
+**********
+select Message0.content, Forum0.title, Tag0.name
+from neo4j,Forum Forum0, Message Message0, Person Person0, Tag Tag0
+where Tag0.name = $param and Person0.email = $param and neo4j.forumid = Forum0.id and neo4j.msgid = Message0.id and neo4j.pid = Person0.id and neo4j.tid = Tag0.id
+##########
+MATCH (p:Person3)-[:WORK_AT]->(o:Organisation)-[:IS_LOCATED_IN]->(country:Country)<-[:IS_PART_OF]-(city:City)
+RETURN o.id as oid, country.id as countryid, p.id as pid, city.id as cityid
+**********
+select City0.name, Organisation0.name, Person0.firstName, Country0.name, Person0.lastName
+from neo4j,Country Country0, City City0, Organisation Organisation0, Person Person0
+where Organisation0.name = $param and neo4j.countryid = Country0.id and neo4j.cityid = City0.id and neo4j.oid = Organisation0.id and neo4j.pid = Person0.id
+##########
+MATCH (p:Person1)-[:KNOWS]->(friend:Person2)-[:HAS_INTEREST]->(tag:Tag)
+
+RETURN friend.id as friendid, p.id as pid, tag.id as tagid
+**********
+select Tag0.name, Person0.firstName, Person0.lastName
+from neo4j,Person Person0, Tag Tag0, Person Person1
+where Person1.firstName = $param and Person1.lastName = $param and neo4j.friendid = Person0.id and neo4j.tagid = Tag0.id and neo4j.pid = Person1.id
+##########
+MATCH (p:Person2)<-[:KNOWS]-(friend:Person2)-[:WORK_AT]->(c:Company)
+
+RETURN friend.id as friendid, c.id as cid, p.id as pid
+**********
+select Company0.name, Person1.lastName, Person0.firstName, Person1.firstName, Person0.lastName
+from neo4j,Company Company0, Person Person0, Person Person1
+where Person0.birthday > $param and Company0.name = $param and neo4j.cid = Company0.id and neo4j.pid = Person0.id and neo4j.friendid = Person1.id
+##########
+MATCH (p:Person1)-[:WORK_AT]->(company:Company)-[:IS_LOCATED_IN]->(place:Place)<-[:IS_LOCATED_IN]-(msg:Message3)
+
+RETURN company.id as companyid, place.id as placeid, msg.id as msgid, p.id as pid
+**********
+select Message0.content, Place0.name, Company0.name
+from neo4j,Message Message0, Person Person0, Company Company0, Place Place0
+where Message0.length > $param and Person0.email = $param and neo4j.msgid = Message0.id and neo4j.pid = Person0.id and neo4j.companyid = Company0.id and neo4j.placeid = Place0.id
+##########
+MATCH (p:Person2)-[:KNOWS]->(friend:Person1)-[:HAS_INTEREST]->(t:Tag)-[:HAS_TYPE]->(tc:TagClass)
+
+RETURN friend.id as friendid, tc.id as tcid, p.id as pid, t.id as tid
+**********
+select Person0.lastName, Person1.firstName, Person0.firstName, Tag0.name, Person1.lastName
+from neo4j,Person Person0, Tag Tag0, Person Person1, TagClass TagClass0
+where TagClass0.name = $param and Person1.speaks = $param and neo4j.friendid = Person0.id and neo4j.tid = Tag0.id and neo4j.pid = Person1.id and neo4j.tcid = TagClass0.id
+##########
+MATCH (f:Forum2)-[:HAS_TAG]->(t:Tag)<-[:HAS_INTEREST]-(person:Person2)-[:KNOWS]->(friend:Person3)
+RETURN friend.id as friendid, person.id as personid, f.id as fid, t.id as tid
+**********
+select Person1.lastName, Person1.firstName, Person0.lastName, Tag0.name, Person0.firstName, Forum0.title
+from neo4j,Forum Forum0, Person Person0, Tag Tag0, Person Person1
+where Tag0.name = $param and Person0.gender = $param and Forum0.title CONTAINS $param and neo4j.fid = Forum0.id and neo4j.personid = Person0.id and neo4j.tid = Tag0.id and neo4j.friendid = Person1.id
+##########
+MATCH (p:Person2)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(m:Message3)-[:IS_LOCATED_IN]->(pl:Place)
+
+RETURN m.id as mid, pl.id as plid, p.id as pid, t.id as tid
+**********
+select Person0.firstName, Place0.name, Tag0.name, Message0.content, Person0.lastName
+from neo4j,Tag Tag0, Person Person0, Message Message0, Place Place0
+where Tag0.name = $param and Place0.name = $param and neo4j.tid = Tag0.id and neo4j.pid = Person0.id and neo4j.mid = Message0.id and neo4j.plid = Place0.id
+##########
+MATCH (p:Person2)-[:KNOWS]->(friend:Person3)-[:WORK_AT]->(c:Company), (friend)-[:HAS_INTEREST]->(tag:Tag)-[:HAS_TYPE]->(tc:TagClass)
+RETURN friend.id as friendid, tag.id as tagid, c.id as cid, tc.id as tcid, p.id as pid
+**********
+select Company0.name, Person0.lastName, Person1.firstName, Tag0.name, Person0.firstName, TagClass0.name, Person1.lastName
+from neo4j,Tag Tag0, TagClass TagClass0, Person Person0, Company Company0, Person Person1
+where TagClass0.name = $param and Person1.speaks CONTAINS $param and neo4j.tagid = Tag0.id and neo4j.tcid = TagClass0.id and neo4j.friendid = Person0.id and neo4j.cid = Company0.id and neo4j.pid = Person1.id
+##########
+MATCH (p:Person2)-[:WORK_AT]->(c:Company)-[:IS_LOCATED_IN]->(pl:Place)<-[:IS_LOCATED_IN]-(m:Message3)
+
+RETURN c.id as cid, pl.id as plid, p.id as pid, m.id as mid
+**********
+select Company0.name, Person0.firstName, Place0.name, Message0.content, Person0.lastName
+from neo4j,Place Place0, Company Company0, Message Message0, Person Person0
+where Message0.browserUsed = $param and Person0.speaks = $param and neo4j.plid = Place0.id and neo4j.cid = Company0.id and neo4j.mid = Message0.id and neo4j.pid = Person0.id
+##########
+MATCH (f:Forum1)-[:HAS_MEMBER]->(p:Person2)-[:WORK_AT]->(c:Company)
+
+RETURN c.id as cid, p.id as pid, f.id as fid
+**********
+select Forum0.title, Person0.lastName, Company0.name, Person0.firstName
+from neo4j,Person Person0, Forum Forum0, Company Company0
+where Forum0.creationDate > $param and Company0.name = $param and neo4j.pid = Person0.id and neo4j.fid = Forum0.id and neo4j.cid = Company0.id
+##########
+MATCH (org:Organisation)<-[:WORK_AT]-(p:Person1)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(m:Message3)
+
+RETURN m.id as mid, org.id as orgid, p.id as pid, t.id as tid
+**********
+select Organisation0.name, Message0.content, Tag0.name, Person0.firstName
+from neo4j,Person Person0, Message Message0, Organisation Organisation0, Tag Tag0
+where Tag0.name = $param and Organisation0.name = $param and Person0.gender = $param and neo4j.pid = Person0.id and neo4j.mid = Message0.id and neo4j.orgid = Organisation0.id and neo4j.tid = Tag0.id
+##########
+MATCH (p:Person2)-[:HAS_INTEREST]->(t:Tag)<-[:HAS_TAG]-(f:Forum2)
+RETURN p.id as pid, f.id as fid, t.id as tid
+**********
+select Forum0.title, Person0.lastName, Tag0.name, Person0.firstName
+from neo4j,Person Person0, Tag Tag0, Forum Forum0
+where Tag0.name = $param and Forum0.creationDate > $param and neo4j.pid = Person0.id and neo4j.tid = Tag0.id and neo4j.fid = Forum0.id

@@ -1,0 +1,41 @@
+MATCH (post:Post2)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)<-[:IS_SUBCLASS_OF*]-(subClass:TagClass)
+
+RETURN tagClass.id as tagClassid, tag.id as tagid, subClass.id as subClassid, post.id as postid
+**********
+select neo4j.postid, Tag0.name, Post0.content, TagClass1.name
+from neo4j,TagClass TagClass0, Tag Tag0, TagClass TagClass1, Post Post0
+where Post0.length > $param and TagClass0.name = $param and neo4j.tagClassid = TagClass0.id and neo4j.tagid = Tag0.id and neo4j.subClassid = TagClass1.id and neo4j.postid = Post0.id
+##########
+MATCH (c:Comment2)-[:REPLY_OF*]->(m:Message1)<-[:CONTAINER_OF]-(f:Forum)
+
+RETURN c.id as cid, f.id as fid, m.id as mid
+**********
+select Forum0.title, Message0.content, Comment0.content
+from neo4j,Comment Comment0, Forum Forum0, Message Message0
+where Forum0.title = $param and Comment0.creationDate > $param and neo4j.cid = Comment0.id and neo4j.fid = Forum0.id and neo4j.mid = Message0.id
+##########
+MATCH (p:Person)-[:LIKES]->(c:Comment2)<-[:REPLY_OF*1..2]-(m:Message2)
+
+RETURN c.id as cid, p.id as pid, m.id as mid
+**********
+select Comment0.creationDate, Comment0.content, neo4j.cid
+from neo4j,Person Person0, Message Message0, Comment Comment0
+where Person0.birthday > $param and Message0.length > $param and neo4j.pid = Person0.id and neo4j.mid = Message0.id and neo4j.cid = Comment0.id
+##########
+MATCH (post:Post2)-[:HAS_TAG]->(tag:Tag)-[:HAS_TYPE]->(tagClass:TagClass)<-[:IS_SUBCLASS_OF*1..2]-(parentTagClass:TagClass)
+
+RETURN tag.id as tagid, post.id as postid, parentTagClass.id as parentTagClassid
+**********
+select neo4j.postid, Tag0.name, Post0.content, TagClass0.name
+from neo4j,Tag Tag0, Post Post0, TagClass TagClass0
+where TagClass0.name = $param and neo4j.tagid = Tag0.id and neo4j.postid = Post0.id and neo4j.parentTagClassid = TagClass0.id
+##########
+MATCH (p:Person3)-[:KNOWS*2]-(friend:Person3)-[:LIKES]->(post:Post3)-[:HAS_TAG]->(t:Tag)
+
+RETURN friend.id as friendid, post.id as postid, p.id as pid, t.id as tid
+**********
+select Person1.lastName, Person0.lastName, Person1.firstName, Person0.firstName, Post0.content
+from neo4j,Person Person0, Person Person1, Post Post0, Tag Tag0
+where Tag0.name = $param and Person1.gender = $param and neo4j.friendid = Person0.id and neo4j.pid = Person1.id and neo4j.postid = Post0.id and neo4j.tid = Tag0.id
+
+
