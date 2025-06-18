@@ -1,0 +1,225 @@
+{
+  "args": {
+    "Order": "year DESC, isComment ASC, lengthCategory ASC",
+    "planner-impl": "IDP",
+    "string-representation": "Planner COST\r\n\r\nRuntime PIPELINED\r\n\r\nRuntime version 5.3\r\n\r\nBatch size 128\r\n\r\n+--------------------+----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+---------------------+\r\n| Operator           | Id | Details                                                                                              | Estimated Rows | Ordered by                                   | Pipeline            |\r\n+--------------------+----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+---------------------+\r\n| +ProduceResults    |  0 | year, isComment, lengthCategory, messageCount, averageMessageLength, sumMessageLength,               |              0 |                                              |                     |\r\n| |                  |    | percentageOfMessages                                                                                 |                |                                              |                     |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+                                              |                     |\r\n| +Projection        |  1 | messageCount / totalMessageCount AS percentageOfMessages                                             |              0 |                                              |                     |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+                                              |                     |\r\n| +Sort              |  2 | year DESC, isComment ASC, lengthCategory ASC                                                         |              0 | year DESC, isComment ASC, lengthCategory ASC | In Pipeline 4       |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+---------------------+\r\n| +Projection        |  3 | anon_0 / toFloat(anon_1) AS averageMessageLength, anon_0 AS sumMessageLength, anon_1 AS messageCount |              0 |                                              | In Pipeline 3       |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+---------------------+\r\n| +EagerAggregation  |  4 | message:Comment AS isComment, CASE WHEN cache[message.length] < $autoint_2 THEN $autoint_3 WHEN cach |              0 |                                              |                     |\r\n| |                  |    | e[message.length] < $autoint_4 THEN $autoint_5 WHEN cache[message.length] < $autoint_6 THEN $autoint |                |                                              |                     |\r\n| |                  |    | _7 ELSE $autoint_8 END AS lengthCategory, year, totalMessageCount, sum(cache[message.length]) AS ano |                |                                              |                     |\r\n| |                  |    | n_0, count(message) AS anon_1, count(message) AS messageCount, sum(cache[message.length]) AS sumMess |                |                                              |                     |\r\n| |                  |    | ageLength                                                                                            |                |                                              |                     |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+                     |\r\n| +Projection        |  5 | cache[message.creationDate].year AS year                                                             |              0 |                                              |                     |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+                     |\r\n| +Filter            |  6 | cache[message.creationDate] < datetime($autostring_1) AND message.content IS NOT NULL                |              0 |                                              |                     |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+                     |\r\n| +Apply             |  7 |                                                                                                      |             10 |                                              |                     |\r\n| |\\                 +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+                     |\r\n| | +NodeByLabelScan |  8 | message:Message                                                                                      |             10 |                                              | Fused in Pipeline 2 |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+---------------------+\r\n| +Projection        |  9 | toFloat(totalMessageCountInt) AS totalMessageCount                                                   |              1 |                                              | In Pipeline 1       |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+---------------------+\r\n| +EagerAggregation  | 10 | count(m) AS totalMessageCountInt                                                                     |              1 |                                              |                     |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+                     |\r\n| +Filter            | 11 | m.creationDate < datetime($autostring_0)                                                             |              0 |                                              |                     |\r\n| |                  +----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+                     |\r\n| +NodeByLabelScan   | 12 | m:Message                                                                                            |             10 |                                              | Fused in Pipeline 0 |\r\n+--------------------+----+------------------------------------------------------------------------------------------------------+----------------+----------------------------------------------+---------------------+\r\n\r\nTotal database accesses: ?\r\n",
+    "runtime": "PIPELINED",
+    "runtime-impl": "PIPELINED",
+    "batch-size": 128,
+    "Details": "year, isComment, lengthCategory, messageCount, averageMessageLength, sumMessageLength, percentageOfMessages",
+    "planner-version": "5.3",
+    "PipelineInfo": "In Pipeline 4",
+    "runtime-version": "5.3",
+    "Id": 0,
+    "EstimatedRows": 0.0,
+    "planner": "COST"
+  },
+  "operatorType": "ProduceResults@neo4j",
+  "children": [
+    {
+      "args": {
+        "Order": "year DESC, isComment ASC, lengthCategory ASC",
+        "Id": 1,
+        "Details": "messageCount / totalMessageCount AS percentageOfMessages",
+        "EstimatedRows": 0.0,
+        "PipelineInfo": "In Pipeline 4"
+      },
+      "operatorType": "Projection@neo4j",
+      "children": [
+        {
+          "args": {
+            "Order": "year DESC, isComment ASC, lengthCategory ASC",
+            "Id": 2,
+            "Details": "year DESC, isComment ASC, lengthCategory ASC",
+            "EstimatedRows": 0.0,
+            "PipelineInfo": "In Pipeline 4"
+          },
+          "operatorType": "Sort@neo4j",
+          "children": [
+            {
+              "args": {
+                "Details": "anon_0 / toFloat(anon_1) AS averageMessageLength, anon_0 AS sumMessageLength, anon_1 AS messageCount",
+                "Id": 3,
+                "EstimatedRows": 0.0,
+                "PipelineInfo": "In Pipeline 3"
+              },
+              "operatorType": "Projection@neo4j",
+              "children": [
+                {
+                  "args": {
+                    "Details": "message:Comment AS isComment, CASE WHEN cache[message.length] < $autoint_2 THEN $autoint_3 WHEN cache[message.length] < $autoint_4 THEN $autoint_5 WHEN cache[message.length] < $autoint_6 THEN $autoint_7 ELSE $autoint_8 END AS lengthCategory, year, totalMessageCount, sum(cache[message.length]) AS anon_0, count(message) AS anon_1, count(message) AS messageCount, sum(cache[message.length]) AS sumMessageLength",
+                    "Id": 4,
+                    "EstimatedRows": 0.0,
+                    "PipelineInfo": "Fused in Pipeline 2"
+                  },
+                  "operatorType": "EagerAggregation@neo4j",
+                  "children": [
+                    {
+                      "args": {
+                        "Details": "cache[message.creationDate].year AS year",
+                        "Id": 5,
+                        "EstimatedRows": 0.0,
+                        "PipelineInfo": "Fused in Pipeline 2"
+                      },
+                      "operatorType": "Projection@neo4j",
+                      "children": [
+                        {
+                          "args": {
+                            "Details": "cache[message.creationDate] < datetime($autostring_1) AND message.content IS NOT NULL",
+                            "Id": 6,
+                            "EstimatedRows": 0.0,
+                            "PipelineInfo": "Fused in Pipeline 2"
+                          },
+                          "operatorType": "Filter@neo4j",
+                          "children": [
+                            {
+                              "args": {
+                                "EstimatedRows": 10.0,
+                                "Id": 7
+                              },
+                              "operatorType": "Apply@neo4j",
+                              "children": [
+                                {
+                                  "args": {
+                                    "Details": "toFloat(totalMessageCountInt) AS totalMessageCount",
+                                    "Id": 9,
+                                    "EstimatedRows": 1.0,
+                                    "PipelineInfo": "In Pipeline 1"
+                                  },
+                                  "operatorType": "Projection@neo4j",
+                                  "children": [
+                                    {
+                                      "args": {
+                                        "Details": "count(m) AS totalMessageCountInt",
+                                        "Id": 10,
+                                        "EstimatedRows": 1.0,
+                                        "PipelineInfo": "Fused in Pipeline 0"
+                                      },
+                                      "operatorType": "EagerAggregation@neo4j",
+                                      "children": [
+                                        {
+                                          "args": {
+                                            "Details": "m.creationDate < datetime($autostring_0)",
+                                            "Id": 11,
+                                            "EstimatedRows": 0.0,
+                                            "PipelineInfo": "Fused in Pipeline 0"
+                                          },
+                                          "operatorType": "Filter@neo4j",
+                                          "children": [
+                                            {
+                                              "args": {
+                                                "Details": "m:Message",
+                                                "Id": 12,
+                                                "EstimatedRows": 10.0,
+                                                "PipelineInfo": "Fused in Pipeline 0"
+                                              },
+                                              "operatorType": "NodeByLabelScan@neo4j",
+                                              "children": [],
+                                              "identifiers": [
+                                                "m"
+                                              ]
+                                            }
+                                          ],
+                                          "identifiers": [
+                                            "m"
+                                          ]
+                                        }
+                                      ],
+                                      "identifiers": [
+                                        "totalMessageCountInt"
+                                      ]
+                                    }
+                                  ],
+                                  "identifiers": [
+                                    "totalMessageCount"
+                                  ]
+                                },
+                                {
+                                  "args": {
+                                    "Details": "message:Message",
+                                    "Id": 8,
+                                    "EstimatedRows": 10.0,
+                                    "PipelineInfo": "Fused in Pipeline 2"
+                                  },
+                                  "operatorType": "NodeByLabelScan@neo4j",
+                                  "children": [],
+                                  "identifiers": [
+                                    "totalMessageCount",
+                                    "message"
+                                  ]
+                                }
+                              ],
+                              "identifiers": [
+                                "totalMessageCount",
+                                "message"
+                              ]
+                            }
+                          ],
+                          "identifiers": [
+                            "totalMessageCount",
+                            "message"
+                          ]
+                        }
+                      ],
+                      "identifiers": [
+                        "totalMessageCount",
+                        "message",
+                        "year"
+                      ]
+                    }
+                  ],
+                  "identifiers": [
+                    "isComment",
+                    "lengthCategory",
+                    "year",
+                    "totalMessageCount",
+                    "anon_0",
+                    "sumMessageLength",
+                    "messageCount",
+                    "anon_1"
+                  ]
+                }
+              ],
+              "identifiers": [
+                "isComment",
+                "lengthCategory",
+                "year",
+                "totalMessageCount",
+                "averageMessageLength",
+                "sumMessageLength",
+                "messageCount"
+              ]
+            }
+          ],
+          "identifiers": [
+            "isComment",
+            "lengthCategory",
+            "year",
+            "totalMessageCount",
+            "averageMessageLength",
+            "sumMessageLength",
+            "messageCount"
+          ]
+        }
+      ],
+      "identifiers": [
+        "isComment",
+        "percentageOfMessages",
+        "lengthCategory",
+        "year",
+        "averageMessageLength",
+        "sumMessageLength",
+        "messageCount"
+      ]
+    }
+  ],
+  "identifiers": [
+    "isComment",
+    "percentageOfMessages",
+    "lengthCategory",
+    "year",
+    "averageMessageLength",
+    "sumMessageLength",
+    "messageCount"
+  ]
+}
