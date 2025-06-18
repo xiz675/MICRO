@@ -1,0 +1,14 @@
+{"Organisation": 10000,
+  "Place": 5000,
+  "Tag": 50000,
+  "TagClass":1000,
+  "Comment": 1000000,
+  "Forum": 500000,
+  "Person": 50000,
+  "Post": 1000000,
+  "Message": 1000000,
+  "Country": 5000,
+  "City": 5000,
+  "Company": 10000,
+  "University": 10000
+}

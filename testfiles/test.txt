@@ -1,0 +1,5 @@
+match (u:People)-[]-(m:Country)-[]-(n:City)
+where n.name = 's'
+with n
+match (x:People)--(n)
+return n
