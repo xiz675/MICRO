@@ -1,0 +1,887 @@
+[
+    [
+        {
+            "plan": [],
+            "time": 2.4765470027923584
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 2.3846826553344727
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 1.029693841934204
+        },
+        {
+            "plan": [
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 2.1095099449157715
+        },
+        {
+            "plan": [
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 3.332010269165039
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 1.1180565357208252
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 2.0284485816955566
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 3.3262953758239746
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 1.0770869255065918
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 4.064697742462158
+        },
+        {
+            "plan": [
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 3.261714458465576
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 1.1700384616851807
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 4.017059087753296
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 3.668278694152832
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 4.237272262573242
+        },
+        {
+            "plan": [
+                [
+                    "tagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "subClass.id",
+                    "TagClass1.id",
+                    "TagClass",
+                    "TagClass"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 4.332739591598511
+        }
+    ],
+    [
+        {
+            "plan": [],
+            "time": 1.048255205154419
+        },
+        {
+            "plan": [
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ]
+            ],
+            "time": 3.4005537033081055
+        },
+        {
+            "plan": [
+                [
+                    "f.id",
+                    "Forum0.id",
+                    "Forum",
+                    "Forum"
+                ]
+            ],
+            "time": 0.9257571697235107
+        },
+        {
+            "plan": [
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message1",
+                    "Message"
+                ]
+            ],
+            "time": 6.162505626678467
+        },
+        {
+            "plan": [
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ],
+                [
+                    "f.id",
+                    "Forum0.id",
+                    "Forum",
+                    "Forum"
+                ]
+            ],
+            "time": 4.0787413120269775
+        },
+        {
+            "plan": [
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ],
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message1",
+                    "Message"
+                ]
+            ],
+            "time": 8.217504978179932
+        },
+        {
+            "plan": [
+                [
+                    "f.id",
+                    "Forum0.id",
+                    "Forum",
+                    "Forum"
+                ],
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message1",
+                    "Message"
+                ]
+            ],
+            "time": 7.394081354141235
+        },
+        {
+            "plan": [
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ],
+                [
+                    "f.id",
+                    "Forum0.id",
+                    "Forum",
+                    "Forum"
+                ],
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message1",
+                    "Message"
+                ]
+            ],
+            "time": 9.309659719467163
+        }
+    ],
+    [
+        {
+            "plan": [],
+            "time": 0.00848388671875
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person0.id",
+                    "Person",
+                    "Person"
+                ]
+            ],
+            "time": 0.33587074279785156
+        },
+        {
+            "plan": [
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message2",
+                    "Message"
+                ]
+            ],
+            "time": 5.037808656692505
+        },
+        {
+            "plan": [
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ]
+            ],
+            "time": 2.8701207637786865
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person0.id",
+                    "Person",
+                    "Person"
+                ],
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message2",
+                    "Message"
+                ]
+            ],
+            "time": 5.215402364730835
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person0.id",
+                    "Person",
+                    "Person"
+                ],
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ]
+            ],
+            "time": 3.194523811340332
+        },
+        {
+            "plan": [
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message2",
+                    "Message"
+                ],
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ]
+            ],
+            "time": 7.861439943313599
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person0.id",
+                    "Person",
+                    "Person"
+                ],
+                [
+                    "m.id",
+                    "Message0.id",
+                    "Message2",
+                    "Message"
+                ],
+                [
+                    "c.id",
+                    "Comment0.id",
+                    "Comment2",
+                    "Comment"
+                ]
+            ],
+            "time": 8.060104131698608
+        }
+    ],
+    [
+        {
+            "plan": [],
+            "time": 2.059213161468506
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 0.9637417793273926
+        },
+        {
+            "plan": [
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 3.2792651653289795
+        },
+        {
+            "plan": [
+                [
+                    "parentTagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 1.746635913848877
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ]
+            ],
+            "time": 4.039911270141602
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "parentTagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 1.0155439376831055
+        },
+        {
+            "plan": [
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ],
+                [
+                    "parentTagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 3.393794059753418
+        },
+        {
+            "plan": [
+                [
+                    "tag.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post2",
+                    "Post"
+                ],
+                [
+                    "parentTagClass.id",
+                    "TagClass0.id",
+                    "TagClass",
+                    "TagClass"
+                ]
+            ],
+            "time": 4.20440411567688
+        }
+    ],
+    [
+        {
+            "plan": [],
+            "time": 2.8370347023010254
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ]
+            ],
+            "time": 2.98822283744812
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ]
+            ],
+            "time": 2.875591278076172
+        },
+        {
+            "plan": [
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ]
+            ],
+            "time": 5.6203813552856445
+        },
+        {
+            "plan": [
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 2.5235707759857178
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ]
+            ],
+            "time": 2.8189332485198975
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ]
+            ],
+            "time": 5.216146230697632
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 3.1173956394195557
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ]
+            ],
+            "time": 5.710952520370483
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 3.166372060775757
+        },
+        {
+            "plan": [
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ],
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 5.388495922088623
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ]
+            ],
+            "time": 5.129271745681763
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 3.1462314128875732
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ],
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 5.8374340534210205
+        },
+        {
+            "plan": [
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ],
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 5.79598331451416
+        },
+        {
+            "plan": [
+                [
+                    "friend.id",
+                    "Person0.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "p.id",
+                    "Person1.id",
+                    "Person3",
+                    "Person"
+                ],
+                [
+                    "post.id",
+                    "Post0.id",
+                    "Post3",
+                    "Post"
+                ],
+                [
+                    "t.id",
+                    "Tag0.id",
+                    "Tag",
+                    "Tag"
+                ]
+            ],
+            "time": 5.851913213729858
+        }
+    ]
+]

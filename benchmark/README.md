@@ -1,9 +1,9 @@
 # Data
 ## Local deployment 
-If you want to develop it locally, please contact authors at xiz675@ucsd.edu for the dataset. The dataset is too large to be uploaded to Google drive.
+For the CM-LDBC benchmark, we provide raw data for users to deploy locally or on CloudLab server like we did for the paper. The dataset is too large to be uploaded to Google drive. Please contact authors at xiz675@ucsd.edu for the dataset. 
 
 ## Remote connection 
-If you do not need to locally develop it, please contact us at xiz675@ucsd.edu for connection details (e.g., host, password) to our exsiting PostgreSQL and Neo4j servers that host the data. 
+For the Openalex-USPTO dataset, please contact us at xiz675@ucsd.edu for connection details (e.g., host, password) to our exsiting PostgreSQL and Neo4j servers that host the data. 
 
 
 # Workload 
