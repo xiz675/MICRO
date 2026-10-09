@@ -119,13 +119,14 @@ def build_data(pg: PostgresUtil, seed=0):
 # fake Neo4j
 # ---------------------------------------------------------------------------
 class FakeNeo4j:
-    moved = {}          # label (with T) -> source PG table, shared across executors (threads)
+    moved = {}          # label (with T) -> (source PG table, number of loaded copies); shared across threads
+    loads = []          # (label, table) of every load, for counting
 
     def __init__(self, pg: PostgresUtil):
         self.pg = pg
         self.executed = []
 
-    def to_sql(self, cypher: str) -> str:
+    def to_sql(self, cypher: str, strict: bool = True) -> str:
         cypher = remove_stars(cypher)
         parts = re.split(r"(?i)\nRETURN\s+", cypher)
         body, ret = parts[0], parts[1]
@@ -143,7 +144,15 @@ class FakeNeo4j:
                     f"{', '.join(f'{r} {a}' for a, r in alias_rels.items())}" +
                     (" WHERE " + " and ".join(list(filter_types) + [f'{x}={y}' for x, y in path_joins])
                      if filter_types or path_joins else ""))
-        frm = [f"({base_sql}) b"] + [f'{self.moved[lab]} {tv}' for tv, lab in moved]
+        def nodes(lab):
+            if lab not in self.moved:
+                if not strict:          # EXPLAIN: Neo4j only warns about labels that do not exist yet
+                    return "(SELECT NULL::bigint AS id)"
+                raise KeyError(f"label {lab} not loaded")
+            table, copies = self.moved[lab]
+            # loading the same label twice really duplicates the nodes in Neo4j -> duplicate rows here
+            return table if copies == 1 else "(" + " UNION ALL ".join([f"SELECT * FROM {table}"] * copies) + ")"
+        frm = [f"({base_sql}) b"] + [f'{nodes(lab)} {tv}' for tv, lab in moved]
 
         def tr(expr):
             expr = re.sub(r"\b(\w+)\.id\b", lambda mm: f"b.{mm.group(1)}__id" if mm.group(1) in named else mm.group(0), expr)
@@ -159,7 +168,13 @@ class FakeNeo4j:
     def run_query(self, query):
         m = re.search(r"'(\w+)'\) YIELD row\",\s*\"CREATE \(x:(\w+)", query, re.S)
         if m:
-            self.moved[m.group(2)] = m.group(1)
+            table, lab = m.group(1), m.group(2)
+            _, copies = self.moved.get(lab, (table, 0))
+            self.moved[lab] = (table, copies + 1)
+            self.loads.append((lab, table))
+        d = re.search(r"MATCH \(n:(\w+)\) RETURN n", query)
+        if d:
+            self.moved.pop(d.group(1), None)      # clean_data deletes all nodes with that label
         self.executed.append(query)
 
     def run_query_return_single_value(self, query):
@@ -180,7 +195,7 @@ class FakeNeo4j:
 
     def explain_query_plan(self, query):
         # like EXPLAIN in Neo4j: raises on an invalid query (here: an untranslatable pattern)
-        self.to_sql(query)
+        self.to_sql(query, strict=False)
         return "{}"
 
 
@@ -287,12 +302,26 @@ def test_driver(make_executor) -> int:
         fails += not cond
         print(f"  {name}: {'OK' if cond else 'FAIL'}")
 
+    import tempfile
+    cache = os.path.join(tempfile.mkdtemp(), "movement_cache.json")
+    ex_reuse = make_executor()
+    ex_reuse.mover = mc.MovementManager(ex_reuse.ex, cache, db_key="test", repeat=3)
     for qi, q in enumerate(FEW_SHOT):
         mq = mq_of(q)
         rep = mc.precheck_query(mq, ex, keep_params=False)
         rec, _ = mc.collect_query(mq, ex, keep_params=False, repeat=1, dry_run=False)
         expect(f"query {qi} passes precheck and is consistent",
                rep["ok"] and rec["usable_for_training"] and all(c["latency"] is not None for c in rec["composite"]))
+        n_loads = len(FakeNeo4j.loads)
+        rec2, _ = mc.collect_query(mq, ex_reuse, keep_params=False, repeat=1, dry_run=False)
+        same = all(json.dumps(a["timings"].get("checksum")) == json.dumps(b["timings"].get("checksum"))
+                   for sa, sb in zip(rec["segments"], rec2["segments"]) for a, b in zip(sa, sb))
+        seg_left = [l for l in FakeNeo4j.moved if re.match(r"S\d+seg", l)]
+        expect(f"query {qi} with movement reuse: same outputs as per-plan movement, seg nodes removed "
+               f"({len(FakeNeo4j.loads) - n_loads} loads)",
+               rec2["usable_for_training"] and same and not seg_left)
+    expect(f"movement cache reused across plans/queries (hits={ex_reuse.mover.hits}, misses={ex_reuse.mover.misses})",
+           ex_reuse.mover.hits > ex_reuse.mover.misses)
 
     # 1) broken query: relationship type that does not exist -> precheck fails as a query error
     mq = mq_of(FEW_SHOT[1])

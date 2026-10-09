@@ -75,8 +75,16 @@ Each component runs once (`sum_i 2^(n_i + [i>1]) + (k-1)` executions) and latenc
     end_i = max(end_{i-1}, pre_i + G_i + R_ia) + R_ib                      seg not moved
     end_i = max(end_{i-1}, pre_i) + move_seg + G_i + R_i                   seg moved
 
+Movement reuse (default): moving a relation costs the same in every plan that moves it, so each
+(table, column set) is loaded 3 times into a scratch label and the median is cached
+(`movement_cache.json`, shared across queries/runs); base tables stay in Neo4j under a persistent label
+(`MS_<table>T`), seg{i-1} is loaded once per segment and deleted at the end of the query. Movement time
+still enters every composed latency. `--no-movement-reuse` gives the per-plan baseline (for reporting
+the collection-time saving); `--reset-persistent` after switching T1/T2 or reloading Neo4j.
+
 `--validate N` runs N sampled composite plans end-to-end (parallel branches in threads) to measure
-the composition error. `test_multiseg_collect.py` checks plan equivalence and the composition on a
+the composition error; it runs after the collection on a clean graph with the real per-plan flow
+(`validation.jsonl`, median relative error in the summary). `test_multiseg_collect.py` checks plan equivalence and the composition on a
 synthetic CM-LDBC in PostgreSQL with an emulated Neo4j (no Neo4j needed).
 
 ## Things that must be instantiated before collection

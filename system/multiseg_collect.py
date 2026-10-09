@@ -27,8 +27,21 @@ Composition, end_i = time seg{i} is available:
     latency(p_1..p_k) = end_k
 Executions per query: sum_i 2^(n_i + [i>1]) + (k-1) instead of prod_i 2^(n_i + [i>1]).
 
+Movement reuse (default; --no-movement-reuse gives the per-plan baseline)
+------------------------------------------------------------------------
+Moving a relation costs the same whichever plan moves it, so movement is also collected per component:
+* each (table, column set) is loaded `--movement-repeat` times into a scratch label, the median time
+  is cached in result_dir/movement_cache.json (shared across queries and runs);
+* base tables stay in Neo4j under one persistent label per table (MS_<table>T, union of needed columns);
+  plans never reload them (`--reset-persistent` after switching T1/T2 or reloading Neo4j);
+* seg{i-1} is loaded once per segment and deleted when the query is finished.
+Movement time still enters every composed latency (pre_base / move_seg); only its execution is shared.
+Per-plan movement and validation use private labels (P_*, V<i>_*), so they never touch MS_* nodes.
+
 `--validate N` executes N sampled composite plans for real (independent branches in parallel
-threads) so the composed estimates can be checked against true end-to-end latency.
+threads) so the composed estimates can be checked against true end-to-end latency. Validation runs after
+the collection, on a clean graph (persistent nodes removed), with the real load/delete-per-plan flow;
+results go to result_dir/validation.jsonl and the median relative error to the summary.
 
 Convention (same as run_workload.py on CM-LDBC): `$param` predicates are NOT executed; filters are
 realised by the pre-filtered tables of the T1/T2 databases. Use --keep-params for instantiated queries.
@@ -158,9 +171,28 @@ def _tvar(alias: str) -> str:
     return "t_" + alias.lower()
 
 
-def _label(stage_idx: int, alias: str) -> str:
-    # run_table_movement_query appends "T"; labels are stage-prefixed so parallel branches never clash
-    return f"S{stage_idx}{alias}"
+def _label(stage_idx: int, m) -> str:
+    """Node label of a moved relation (run_table_movement_query appends "T").
+    Base tables share one label per table (MS_<table>), so their nodes can stay in Neo4j across plans and
+    queries; seg{i-1} gets a per-segment label and lives for one query."""
+    return f"S{stage_idx}{m.alias}" if m.is_seg else f"MS_{m.table}"
+
+
+def relabel(cypher: str, moves: list, prefix: str):
+    """Give moved relations private labels (per-plan movement, validation) so they never touch the
+    persistent MS_<table>T nodes of the movement-reuse mode."""
+    for _, label, _ in moves:
+        cypher = cypher.replace(f":{label}T)", f":{prefix}{label}T)")
+    return cypher, [(t, f"{prefix}{l}", c) for t, l, c in moves]
+
+
+def dedup_moves(moves: list) -> list:
+    """One load per label: two aliases of the same table (Person0, Person1) share the moved nodes."""
+    merged = {}
+    for table, label, cols in moves:
+        t, c = merged.get(label, (table, set()))
+        merged[label] = (t, c | set(cols))
+    return [(t, l, sorted(c)) for l, (t, c) in merged.items()]
 
 
 def _refs(text: str, alias: str) -> set:
@@ -217,7 +249,7 @@ class SegmentRewriter:
         matches, conds, rets = [ps.cypher_match], [], []
         for m in moved:
             tv = _tvar(m.alias)
-            matches.append(f"MATCH ({tv}:{_label(ps.idx, m.alias)}T)")
+            matches.append(f"MATCH ({tv}:{_label(ps.idx, m)}T)")
             conds.append(f"{m.var}.id = {tv}.{m.table_col}")
             rets += [f"{tv}.{c} as {tv}{c}" for c in sorted(moved_cols[m.alias])]
         for it in ps.return_items:
@@ -273,9 +305,9 @@ class SegmentRewriter:
 
         needed = set(re.findall(r"\bneo4j\.(\w+)", sql))
         cypher = self._cypher(moved, needed, moved_cols)
-        move_base = [(m.table, _label(ps.idx, m.alias), sorted(moved_cols[m.alias] | {m.table_col}))
-                     for m in moved if not m.is_seg]
-        move_seg = [(m.table, _label(ps.idx, m.alias), sorted(moved_cols[m.alias] | {m.table_col}))
+        move_base = dedup_moves([(m.table, _label(ps.idx, m), sorted(moved_cols[m.alias] | {m.table_col}))
+                                 for m in moved if not m.is_seg])
+        move_seg = [(m.table, _label(ps.idx, m), sorted(moved_cols[m.alias] | {m.table_col}))
                     for m in moved if m.is_seg]
         tuples = [(f"{m.var}.id", f"{m.alias}.{m.table_col}", m.var_label, "SEG" if m.is_seg else m.table)
                   for m in moved]
@@ -316,6 +348,80 @@ def py_checksum(rows) -> list:
     return [len(rows or []), h]
 
 
+class MovementManager:
+    """Component-wise collection of relation movements (PG -> Neo4j).
+
+    * movement time is measured once per (database, table, column set): `repeat` timed loads into a
+      scratch label (each deleted afterwards), median kept, cached in a JSON file across runs;
+    * base tables are kept in Neo4j under one persistent label per table (MS_<table>T), loaded with the
+      union of the columns needed so far, so plans never reload them;
+    * seg{i-1} is loaded once per segment (also timed with `repeat`) and deleted when the query is done.
+    Movement time is still part of every composed latency; only the execution is shared.
+    """
+
+    def __init__(self, run_plan, cache_path: str, db_key: str, repeat: int = 3):
+        self.ex, self.cache_path, self.db_key, self.repeat = run_plan, cache_path, db_key, repeat
+        self.state = {"times": {}, "persistent": {}}
+        if cache_path and os.path.exists(cache_path):
+            with open(cache_path) as f:
+                self.state.update(json.load(f))
+        self.persistent = self.state["persistent"].setdefault(db_key, {})
+        self.seg_loaded = {}          # label -> measured seconds (current query)
+        self.hits = self.misses = 0
+
+    def _save(self):
+        if self.cache_path:
+            with open(self.cache_path, "w") as f:
+                json.dump(self.state, f, indent=1)
+
+    def _measure(self, table: str, cols: list) -> float:
+        samples = []
+        for _ in range(self.repeat):
+            t = time.time()
+            self.ex.run_table_movement_query([(table, f"MT_{table}", sorted(cols))])
+            samples.append(time.time() - t)
+            self.ex.clean_data({f"MT_{table}"})
+        return sorted(samples)[len(samples) // 2]
+
+    def move_time(self, table: str, cols: list) -> float:
+        key = f"{self.db_key}|{table}|{','.join(sorted(cols))}"
+        if key in self.state["times"]:
+            self.hits += 1
+        else:
+            self.misses += 1
+            self.state["times"][key] = self._measure(table, cols)
+            self._save()
+        return self.state["times"][key]
+
+    def ensure_persistent(self, table: str, label: str, cols: list):
+        loaded = set(self.persistent.get(table, []))
+        if set(cols) <= loaded:
+            return
+        union = sorted(loaded | set(cols))
+        if loaded:
+            self.ex.clean_data({label})
+        self.ex.run_table_movement_query([(table, label, union)])
+        self.persistent[table] = union
+        self._save()
+
+    def seg_time(self, table: str, label: str, cols: list) -> float:
+        if label not in self.seg_loaded:
+            self.seg_loaded[label] = self._measure(table, cols)
+            self.ex.run_table_movement_query([(table, label, sorted(cols))])
+        return self.seg_loaded[label]
+
+    def end_query(self):
+        if self.seg_loaded:
+            self.ex.clean_data(set(self.seg_loaded))
+        self.seg_loaded = {}
+
+    def drop_persistent(self):
+        if self.persistent:
+            self.ex.clean_data({f"MS_{t}" for t in self.persistent})
+        self.persistent.clear()
+        self._save()
+
+
 class SegmentExecutor:
     """Runs one segment plan and records component times, row counts, errors and an output checksum.
 
@@ -324,8 +430,9 @@ class SegmentExecutor:
     CREATE TABLE ... AS whose table does not exist afterwards.
     """
 
-    def __init__(self, executor, timeout_count=True, keep_result=False, checksum=True):
+    def __init__(self, executor, timeout_count=True, keep_result=False, checksum=True, mover=None):
         self.ex = executor            # utils.run_plan_util.RunPlan
+        self.mover = mover            # MovementManager -> reuse movements; None -> load/delete per plan
         self.pg, self.nj = executor.pg_util, executor.neo4j_util
         self.timeout_count = timeout_count
         self.keep_result = keep_result    # keep the last final result (tests)
@@ -374,15 +481,29 @@ class SegmentExecutor:
 
     def run_plan(self, plan: SegmentPlan, output: str, last: bool, ra_table: str = None) -> dict:
         tm = {"status": "ok"}
-        labels = [l for _, l, _ in plan.move_base + plan.move_seg]
+        cypher, labels = plan.cypher, []
+        if not self.mover:
+            # per-plan movement under private labels (load now, delete after the plan)
+            cypher, moves = relabel(plan.cypher, plan.move_base + plan.move_seg, "P_")
+            move_base, move_seg = moves[:len(plan.move_base)], moves[len(plan.move_base):]
+            labels = [l for _, l, _ in moves]
         try:
             try:
-                tm["pre_base"], _ = self._timed(self.ex.run_table_movement_query, plan.move_base)
-                tm["move_seg"], _ = self._timed(self.ex.run_table_movement_query, plan.move_seg)
+                if self.mover:
+                    # movement executed/measured once and reused; its time still enters the composition
+                    tm["pre_base"] = 0.0
+                    for table, label, cols in plan.move_base:
+                        self.mover.ensure_persistent(table, label, cols)
+                        tm["pre_base"] += self.mover.move_time(table, cols)
+                    tm["move_seg"] = sum(self.mover.seg_time(t, l, c) for t, l, c in plan.move_seg)
+                    tm["movement_reused"] = True
+                else:
+                    tm["pre_base"], _ = self._timed(self.ex.run_table_movement_query, move_base)
+                    tm["move_seg"], _ = self._timed(self.ex.run_table_movement_query, move_seg)
             except Exception as e:     # noqa: BLE001
                 tm.update(status="error", error=f"table movement: {e}")
                 return tm
-            tm["graph"], tm["graph_rows"], st = self.run_graph(plan.cypher, "neo4j")
+            tm["graph"], tm["graph_rows"], st = self.run_graph(cypher, "neo4j")
             if st != "ok":
                 tm.update(status=st, timeout=st in ("timeout", "too_large"))
                 if st == "error":
@@ -413,7 +534,8 @@ class SegmentExecutor:
                 if self.keep_result:
                     self.last_result = res
         finally:
-            self.ex.clean_data(set(labels))
+            if labels:
+                self.ex.clean_data(set(labels))
         return tm
 
     def run_rib(self, sql: str, output: str, last: bool) -> dict:
@@ -500,11 +622,13 @@ def run_composite(make_executor, rewriters, plans_by_stage, combo, outputs) -> f
             nj_table = f"neo4j_s{i + 1}"
             ren = {"neo4j": nj_table}
             sql = _rename_tables(plan.sql, ren)
-            ex.ex.run_table_movement_query(plan.move_base)
+            # real flow: every branch loads its own copies under branch-specific labels (no sharing)
+            cypher, moves = relabel(plan.cypher, plan.move_base + plan.move_seg, f"V{i + 1}_")
+            ex.ex.run_table_movement_query(moves[:len(plan.move_base)])
             if i > 0 and plan.seg_moved:
                 done[i - 1].wait()
-                ex.ex.run_table_movement_query(plan.move_seg)
-            ex.run_graph(plan.cypher, nj_table)
+                ex.ex.run_table_movement_query(moves[len(plan.move_base):])
+            ex.run_graph(cypher, nj_table)
             if plan.split:
                 ra = f"r{i + 1}a"
                 ex.pg.run_query(f'DROP TABLE IF EXISTS "{ra}"')
@@ -538,7 +662,7 @@ def run_composite(make_executor, rewriters, plans_by_stage, combo, outputs) -> f
     # clean-up happens outside the measured interval
     for i, ex in enumerate(executors):
         p = plans_by_stage[i][combo[i]]
-        ex.ex.clean_data({l for _, l, _ in p["move_base"] + p["move_seg"]})
+        ex.ex.clean_data({f"V{i + 1}_{l}" for _, l, _ in p["move_base"] + p["move_seg"]})
         ex.pg.run_query(f'DROP TABLE IF EXISTS "neo4j_s{i + 1}"')
         ex.pg.disconnect()
     if errors:
@@ -607,6 +731,17 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
 
 
 def collect_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, repeat: int, dry_run: bool):
+    t_start = time.time()
+    try:
+        rec, rws = _collect_query(mq, seg_ex, keep_params, repeat, dry_run)
+    finally:
+        if seg_ex is not None and seg_ex.mover:
+            seg_ex.mover.end_query()          # seg{i} nodes live for one query only
+    rec["collection_seconds"] = time.time() - t_start
+    return rec, rws
+
+
+def _collect_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, repeat: int, dry_run: bool):
     stages, rewriters = build_rewriters(mq, keep_params)
     k = len(stages)
     plans_by_stage, rib_time, rib_rec, raw_plans, consistency = [], [0.0] * k, {}, [], []
@@ -678,6 +813,12 @@ def main():
     ap.add_argument("--precheck-only", action="store_true",
                     help="only run the cheap precheck; write the passing queries to precheck_passed.jsonl")
     ap.add_argument("--no-precheck", action="store_true", help="skip the precheck before collection")
+    ap.add_argument("--no-movement-reuse", action="store_true",
+                    help="load/delete moved tables for every plan (baseline for the collection-time comparison)")
+    ap.add_argument("--movement-repeat", type=int, default=3, help="timed loads per (table, columns); median")
+    ap.add_argument("--reset-persistent", action="store_true",
+                    help="delete the persistent base-table nodes first (e.g. after switching T1/T2 or a Neo4j reload)")
+    ap.add_argument("--drop-persistent-at-end", action="store_true")
     ap.add_argument("--max-precheck-seconds", type=float, default=None,
                     help="drop queries whose canonical plan takes longer than this")
     ap.add_argument("--nj-uri", default="localhost")
@@ -699,19 +840,27 @@ def main():
         from utils.pg_utils import PostgresUtil
         from utils.run_plan_util import RunPlan
 
-        def make_executor(timeout_count=True):
+        def make_executor(timeout_count=True, mover=None):
             nj = Neo4jUtil(f"bolt://{args.nj_uri}", args.nj_user, args.nj_pw, args.nj_db)
             pg = PostgresUtil(args.pg_db, args.pg_user, args.pg_pw, args.pg_host)
             pg.connect()
-            return SegmentExecutor(RunPlan(pg, nj), timeout_count)
+            return SegmentExecutor(RunPlan(pg, nj), timeout_count, mover=mover)
         seg_ex = make_executor()
+        if not args.no_movement_reuse:
+            seg_ex.mover = MovementManager(seg_ex.ex, os.path.join(args.result_dir, "movement_cache.json"),
+                                           db_key=f"{args.nj_uri}/{args.nj_db}|{args.pg_host}/{args.pg_db}",
+                                           repeat=args.movement_repeat)
+            if args.reset_persistent:
+                seg_ex.mover.drop_persistent()
 
     queries = [json.loads(l) for l in open(args.queries)]
     out_path = os.path.join(args.result_dir, "multiseg_plans_with_runtime.jsonl")
     pre_path = os.path.join(args.result_dir, "precheck_report.jsonl")
     passed_path = os.path.join(args.result_dir, "precheck_passed.jsonl")
     summary = {"queries": len(queries), "skipped_params": 0, "precheck_failed_query": 0,
-               "precheck_failed_rewrite": 0, "collected": 0, "inconsistent_or_plan_errors": 0}
+               "precheck_failed_rewrite": 0, "collected": 0, "inconsistent_or_plan_errors": 0,
+               "collection_seconds": 0.0}
+    to_validate = []
     with open(out_path, "w") as out, open(pre_path, "w") as pre, open(passed_path, "w") as passed:
         for qi, mq in enumerate(queries):
             logging.info(f"============= query {qi} =============")
@@ -753,14 +902,35 @@ def main():
                     summary["inconsistent_or_plan_errors"] += 1
                     print(f"[warn] query {qi}: plan outputs differ or plans failed: {rec['consistency']}")
             if args.validate and not args.dry_run and rec["composite"]:
-                outputs = [s["output"] for s in mq["stages"]]
-                cands = [c for c in rec["composite"] if not c["timeout"] and not c.get("error")]
-                rec["validation"] = []
-                for c in random.sample(cands, min(args.validate, len(cands))):
-                    real = run_composite(make_executor, rewriters, rec["segments"], c["combo"], outputs)
-                    rec["validation"].append({"combo": c["combo"], "composed": c["latency"], "real": real})
+                to_validate.append((qi, mq, rec))
             out.write(json.dumps(rec) + "\n")
             out.flush()
+            summary["collection_seconds"] += rec.get("collection_seconds", 0)
+
+    if to_validate:
+        # real flow on a clean graph: persistent base-table nodes are removed first, every branch loads
+        # and deletes its own moved tables, independent branches run in parallel threads
+        if seg_ex.mover:
+            seg_ex.mover.drop_persistent()
+        val_path = os.path.join(args.result_dir, "validation.jsonl")
+        rel_err = []
+        with open(val_path, "w") as vf:
+            for qi, mq, rec in to_validate:
+                _, rws = build_rewriters(mq, args.keep_params)
+                outputs = [s["output"] for s in mq["stages"]]
+                cands = [c for c in rec["composite"] if not c["timeout"] and not c.get("error")]
+                for c in random.sample(cands, min(args.validate, len(cands))):
+                    real = run_composite(make_executor, rws, rec["segments"], c["combo"], outputs)
+                    vf.write(json.dumps({"query_id": qi, "combo": c["combo"], "composed": c["latency"],
+                                         "real": real}) + "\n")
+                    rel_err.append(abs(c["latency"] - real) / max(real, 1e-9))
+        rel_err.sort()
+        summary["validation_plans"] = len(rel_err)
+        summary["validation_median_rel_error"] = rel_err[len(rel_err) // 2] if rel_err else None
+    elif seg_ex is not None and seg_ex.mover and args.drop_persistent_at_end:
+        seg_ex.mover.drop_persistent()
+    if seg_ex is not None and seg_ex.mover:
+        summary["movement_cache_hits"], summary["movement_cache_misses"] = seg_ex.mover.hits, seg_ex.mover.misses
     print(json.dumps(summary, indent=1))
     print(f"wrote {out_path}" + ("" if args.dry_run else f", {pre_path}, {passed_path}"))
 
