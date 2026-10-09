@@ -803,6 +803,8 @@ def _median_timings(runs: list) -> dict:
 
 
 def main():
+    from utils.env_util import load_env
+    load_env()                                        # NEO4J_PASSWORD / PG_PASSWORD from <repo>/.env
     ap = argparse.ArgumentParser()
     ap.add_argument("queries", help="multiseg_queries.jsonl from multiseg_query_rewrite.py")
     ap.add_argument("result_dir")

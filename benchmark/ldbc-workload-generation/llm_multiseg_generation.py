@@ -481,6 +481,10 @@ if __name__ == "__main__":
         _selftest()
     else:
         from openai import OpenAI
-        generate(OpenAI(api_key=os.environ.get("OPENAI_API_KEY")), a.out, target_valid=a.target,
+        from utils.env_util import load_env
+        load_env()                                    # OPENAI_API_KEY from <repo>/.env (git-ignored)
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise SystemExit("OPENAI_API_KEY is not set: put it in <repo>/.env (see .env.example)")
+        generate(OpenAI(api_key=os.environ["OPENAI_API_KEY"]), a.out, target_valid=a.target,
                  per_call=a.per_call, max_calls=a.max_calls, seed=a.seed, model=a.model)
         # next: python multiseg_query_rewrite.py <out> <prefix>; then system/multiseg_collect.py --precheck-only

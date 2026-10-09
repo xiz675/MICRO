@@ -1,5 +1,6 @@
 # for unspecified query, check if it is >= 1 or < 1
 # for correct unspecified query, add it to the correct query file, and rewrite it to cross model queries
+import os
 from utils.neo4jutils import Neo4jUtil
 
 if __name__ == '__main__':
@@ -11,7 +12,7 @@ if __name__ == '__main__':
     uri = "bolt://localhost:7687"
     user = "neo4j"
     db_name = "test"
-    password = "1996AHtc!"
+    password = os.environ.get("NEO4J_PASSWORD", "")
     neo4j_util = Neo4jUtil(uri, user, password, db_name)
     correct_queries = []
     for query in cypher_queries:

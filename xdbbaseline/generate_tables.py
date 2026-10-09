@@ -1,6 +1,7 @@
 # generate relationship tables from the relationship csv files, for some tables, need to combine several csv files, and
 #  add filter columns
 # only extract relevant columns
+import os
 import argparse
 import glob
 import re
@@ -191,13 +192,13 @@ if __name__ == '__main__':
     parser.add_argument('--nj-uri', dest='nj_uri', default='bolt://localhost:7687', type=str, help='Neo4j database URI')
     parser.add_argument('--nj-db', dest='nj_db', default='neo4j', type=str, help='Neo4j database name')
     parser.add_argument('--nj-user', dest='nj_user', default='neo4j', type=str, help='Neo4j user name')
-    parser.add_argument('--nj-pw', dest='nj_pw', default='1996AHtc!', type=str, help='Neo4j password')
+    parser.add_argument('--nj-pw', dest='nj_pw', default=os.environ.get('NEO4J_PASSWORD', ''), type=str, help='Neo4j password')
 
     # Add arguments for PostgreSQL
     parser.add_argument('--pg-host', dest='pg_host', default='localhost', type=str, help='PostgreSQL database host')
     parser.add_argument('--pg-db', dest='pg_db', default='postgres', type=str, help='PostgreSQL database name')
     parser.add_argument('--pg-user', dest='pg_user', default='postgres', type=str, help='PostgreSQL user name')
-    parser.add_argument('--pg-pw', dest='pg_pw', default='xw', type=str, help='PostgreSQL password')
+    parser.add_argument('--pg-pw', dest='pg_pw', default=os.environ.get('PG_PASSWORD', ''), type=str, help='PostgreSQL password')
 
     parser.add_argument('--data-dir', dest='data_dir', type=str, required=True)
     parser.add_argument('--header-file', dest='header_file', type=str, required=True)

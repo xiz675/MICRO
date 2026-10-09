@@ -1,0 +1,8 @@
+# secrets
+.env
+# local artifacts
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+tkde-patches/
