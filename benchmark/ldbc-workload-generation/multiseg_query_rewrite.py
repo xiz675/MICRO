@@ -54,6 +54,12 @@ class Stage:
     bound_cypher: str = None             # graph query with carried_in pushed back into Neo4j
     path_length: int = 0
     tables_touched: list = field(default_factory=list)
+    # structured parts used by the plan collector (system/multiseg_collect.py)
+    core_sql: str = ""                   # select/from/where/group by, before the boundary operations
+    post_where: str = ""                 # HAVING-like predicate on aggregate aliases
+    order_by: str = ""
+    limit: str = ""
+    distinct: bool = False
 
 
 @dataclass
@@ -63,6 +69,16 @@ class MultiSegQuery:
     stages: list
     combined_sql: str                    # all SQL stages as one CTE chain over neo4j1..neo4jk
     full_sql: str = None                 # single-model (all-PostgreSQL) equivalent, for XDB / PG-only runs
+
+
+def _count_select_items(sql: str) -> int:
+    select = re.search(r"(?is)^\s*select\s+(.*?)\nfrom\b", sql).group(1)
+    depth, n = 0, 1
+    for ch in select:
+        depth += ch == "("
+        depth -= ch == ")"
+        n += ch == "," and depth == 0
+    return n
 
 
 def _alias_only(text: str, what: str):
@@ -139,14 +155,22 @@ def decompose_multiseg(query: str, modify_labels: bool = True, expected_k: int =
         for v in carried_in:
             if not re.search(rf"\b{re.escape(v)}\.id as {re.escape(v)}id\b", cypher):
                 cypher += f", {v}.id as {v}id"
-        sql = _finish_sql(sql, idx, post_where, order_by, limit,
-                          distinct=(not last and seg.with_distinct))
+        core_sql = sql.rstrip()
+        distinct = not last and seg.with_distinct
+        if limit:
+            # top-k must be deterministic: ties would make seg{i} (and every later segment) plan-dependent,
+            # breaking both plan equivalence and segment-wise timing reuse -> break ties on all output columns
+            n_out = _count_select_items(core_sql)
+            ties = ", ".join(str(j) for j in range(1, n_out + 1))
+            order_by = f"{order_by}, {ties}" if order_by else f"ORDER BY {ties}"
+        sql = _finish_sql(sql, idx, post_where, order_by, limit, distinct=distinct)
 
         stages.append(Stage(
             cypher=cypher, sql=sql, output="result" if last else f"seg{idx}",
             carried_in=list(carried_in), carried_out=[] if last else list(seg.carried),
             bound_cypher=_bind(cypher, carried_in, labels, prev) if carried_in else None,
-            path_length=stats.total_path_length, tables_touched=sorted(stats.touched_table_types)))
+            path_length=stats.total_path_length, tables_touched=sorted(stats.touched_table_types),
+            core_sql=core_sql, post_where=post_where, order_by=order_by, limit=limit, distinct=distinct))
         carried_in = [] if last else seg.carried
 
     ctes = []

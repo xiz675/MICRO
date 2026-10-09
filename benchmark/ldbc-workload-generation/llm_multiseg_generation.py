@@ -144,7 +144,7 @@ def fill_limits(cypher: str, rng: random.Random) -> tuple[str, list]:
 # ---------------------------------------------------------------------------
 FEW_SHOT = [
     # k=2, top-k boundary
-    """MATCH (p:Person {id: $personId})-[:KNOWS*1..2]-(f:Person)<-[:HAS_CREATOR]-(m:Post)
+    """MATCH (p:Person {firstName: $firstName})-[:KNOWS*1..2]-(f:Person)<-[:HAS_CREATOR]-(m:Post)
 WHERE f.birthday > $birthday AND m.creationDate > $date
 WITH f, count(m) AS postCount ORDER BY postCount DESC LIMIT $k
 MATCH (f)<-[:HAS_CREATOR]-(:Post)<-[:REPLY_OF]-(c:Comment)-[:HAS_TAG]->(t:Tag)
@@ -186,7 +186,7 @@ Hard rules (a query violating any rule is discarded):
 2. Segments are separated by WITH. Each boundary WITH must contain an aggregation (count/avg/min/max/sum) and may be followed by WHERE on the aggregate or ORDER BY ... LIMIT. WHERE and ORDER BY after a WITH or RETURN may only refer to aliases defined in that WITH/RETURN (e.g. `ORDER BY postCount DESC`), never to `var.property`.
 3. Segment i+1 must start from a node variable carried through the preceding WITH, written without a label, e.g. `MATCH (f)-[...]->...`.
 4. Every segment must contain at least one predicate on a node property other than `id` (inline `{{prop: $p}}` or in WHERE), or the boundary must aggregate a property other than `id`.
-5. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels, properties and relationship directions from the schema. There are no relationship properties.
+5. Never filter on `id`. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels, properties and relationship directions from the schema. There are no relationship properties.
 6. Use $placeholders for every constant, including LIMIT ($k) and thresholds ($n). Do not use equality on datetime properties. Do not use STARTS WITH, ENDS WITH, CONTAINS or regex.
 7. The queries must be semantically meaningful: each stage should narrow down or rank entities that the next stage explores. Write a one-sentence natural-language description for each.
 8. The {n} queries must differ from each other in node labels and relationship types used.

@@ -54,8 +54,10 @@ class Neo4jUtil:
         # except Exception as e:
         #     logging.error(f"Error executing the query: {e}")
 
-    def run_query_stream(self, query, pg_util: PostgresUtil, batch_size=50*1024*1024, max_records=10000000):
-        """Stream results from Neo4j and process them in batches."""
+    def run_query_stream(self, query, pg_util: PostgresUtil, batch_size=50*1024*1024, max_records=10000000,
+                         table_name="neo4j"):
+        """Stream results from Neo4j and process them in batches.
+        table_name: PG table receiving the result (multi-segment plans use one table per segment)."""
         try:
             with self._driver.session() as session:
                 start_time = time.time()
@@ -64,8 +66,6 @@ class Neo4jUtil:
                 logging.info(f"---Sub: Cypher query cost: {time.time() - start_time} seconds")
                 is_table_created = False
                 total_rows = 0
-                # create table
-                table_name = "neo4j"
 
                 peek_record = result.peek()
                 if peek_record is None:
