@@ -20,6 +20,7 @@ alternative where seg{i-1} is pushed back into Neo4j and G_i starts from those v
 MICRO's optimization decision, not part of the benchmark.
 """
 import json
+import os
 import random
 import re
 import sys
@@ -243,6 +244,8 @@ if __name__ == "__main__":
     if len(sys.argv) >= 3:
         # python multiseg_query_rewrite.py <llm_output.jsonl> <out_prefix>
         in_path, out_prefix = sys.argv[1], sys.argv[2]
+        if os.path.dirname(out_prefix):
+            os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
         ok, reasons = [], Counter()
         with open(in_path) as f:
             for line in f:

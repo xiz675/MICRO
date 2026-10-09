@@ -235,17 +235,19 @@ def _signature(cypher: str) -> str:
 
 
 def generate(openai_client, out_path: str, target_valid: int = 100, per_call: int = 5, max_calls: int = 300,
-             seed: int = 0, model: str = "gpt-4o", rejected_path: str = None):
+             seed: int = 0, model: str = "gpt-4o", rejected_path: str = None, k: int = None):
     """Call the LLM until `target_valid` queries pass the static checker + deterministic decomposition.
-    Passing queries go to out_path, the rest (with the reason) to rejected_path."""
+    Passing queries go to out_path, the rest (with the reason) to rejected_path.
+    k: only generate (and keep) k-segment queries; None samples k from K_DIST."""
     from multiseg_query_rewrite import decompose_multiseg   # local import: that module imports this one
     rng = random.Random(seed)
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     rejected_path = rejected_path or out_path.replace(".jsonl", "") + "_rejected.jsonl"
     seen, n_valid, n_calls, k_count = set(), 0, 0, {}
     with open(out_path, "a") as f, open(rejected_path, "a") as rej:
         while n_valid < target_valid and n_calls < max_calls:
             n_calls += 1
-            spec = sample_shape(rng)
+            spec = sample_shape(rng, k=k)
             try:
                 resp = openai_client.chat.completions.create(
                     model=model, temperature=0.8, max_tokens=4000,
@@ -266,6 +268,8 @@ def generate(openai_client, out_path: str, target_valid: int = 100, per_call: in
                     if sig in seen:
                         raise ValueError("duplicate")
                     mq = decompose_multiseg(q["cypher"])
+                    if k is not None and mq.k != k:
+                        raise ValueError(f"expected {k} segments, got {mq.k}")
                     if any("$" in st.limit + st.post_where for st in mq.stages):
                         raise ValueError("unfilled boundary threshold")
                 except Exception as e:     # noqa: BLE001
@@ -476,6 +480,8 @@ if __name__ == "__main__":
     ap.add_argument("--per-call", type=int, default=5)
     ap.add_argument("--max-calls", type=int, default=300)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--k", type=int, choices=[2, 3], default=None,
+                    help="only generate k-segment queries (default: mix of 2 and 3, see K_DIST)")
     a = ap.parse_args()
     if not a.generate:
         _selftest()
@@ -486,5 +492,5 @@ if __name__ == "__main__":
         if not os.environ.get("OPENAI_API_KEY"):
             raise SystemExit("OPENAI_API_KEY is not set: put it in <repo>/.env (see .env.example)")
         generate(OpenAI(api_key=os.environ["OPENAI_API_KEY"]), a.out, target_valid=a.target,
-                 per_call=a.per_call, max_calls=a.max_calls, seed=a.seed, model=a.model)
+                 per_call=a.per_call, max_calls=a.max_calls, seed=a.seed, model=a.model, k=a.k)
         # next: python multiseg_query_rewrite.py <out> <prefix>; then system/multiseg_collect.py --precheck-only
