@@ -72,7 +72,7 @@ BOUNDARY_OPS = {
     "topk": "keep the top-$k groups: `WITH x, count(...) AS c ORDER BY c DESC LIMIT $k`",
     "having": "keep groups passing a threshold: `WITH x, count(...) AS c WHERE c > $n`",
     "attr_agg": ("aggregate a node property (avg/min/max over a non-id property such as length, "
-                 "birthday, creationDate) and then filter or top-k on it"),
+                 "birthday, creationDate), then `ORDER BY` that aggregate and `LIMIT $k` (no threshold)"),
 }
 ANCHOR_LABELS = ["Person", "Forum", "Tag", "TagClass", "Country", "City", "University", "Company", "Post", "Comment"]
 FINAL_OPS = {
@@ -204,25 +204,80 @@ def build_prompt(spec: ShapeSpec, rng: random.Random, n: int = 5, n_shots: int =
                                   examples="\n\n".join(shots))
 
 
-def generate(openai_client, out_path: str, num_calls: int = 40, per_call: int = 5, seed: int = 0,
-             model: str = "gpt-4o"):
+# HAVING-style thresholds on count aggregates; non-count thresholds are not filled (scale unknown) and the
+# collector skips such queries -> the prompt asks for top-k instead of thresholds on avg/min/max.
+COUNT_THRESHOLD_TIERS = [2, 3, 5, 10, 20]
+_BOUNDARY_WHERE = re.compile(
+    r"(?is)\bWITH\b((?:(?!\bMATCH\b|\bRETURN\b).)*?)\bWHERE\b((?:(?!\bMATCH\b|\bRETURN\b|\bORDER\s+BY\b|\bLIMIT\b).)*)")
+
+
+def fill_thresholds(cypher: str, rng: random.Random) -> tuple[str, list]:
+    """Replace `$x` in a WHERE right after WITH (HAVING-like) with a tier, if it compares a count alias."""
+    chosen = []
+
+    def _with(m):
+        projection, cond = m.group(1), m.group(2)
+        count_aliases = set(re.findall(r"(?i)\bcount\s*\([^)]*\)\s+AS\s+(\w+)", projection))
+
+        def _sub(mm):
+            if mm.group(1) in count_aliases:
+                v = rng.choice(COUNT_THRESHOLD_TIERS)
+                chosen.append(v)
+                return f"{mm.group(1)} {mm.group(2)} {v}"
+            return mm.group(0)
+        cond = re.sub(r"(\w+)\s*(>=|<=|>|<|=)\s*\$\w+", _sub, cond)
+        return m.group(0)[:m.start(2) - m.start(0)] + cond
+    return _BOUNDARY_WHERE.sub(_with, cypher), chosen
+
+
+def _signature(cypher: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"\$\w+|\b\d+\b", "?", cypher)).strip().lower()
+
+
+def generate(openai_client, out_path: str, target_valid: int = 100, per_call: int = 5, max_calls: int = 300,
+             seed: int = 0, model: str = "gpt-4o", rejected_path: str = None):
+    """Call the LLM until `target_valid` queries pass the static checker + deterministic decomposition.
+    Passing queries go to out_path, the rest (with the reason) to rejected_path."""
+    from multiseg_query_rewrite import decompose_multiseg   # local import: that module imports this one
     rng = random.Random(seed)
-    with open(out_path, "a") as f:
-        for _ in range(num_calls):
+    rejected_path = rejected_path or out_path.replace(".jsonl", "") + "_rejected.jsonl"
+    seen, n_valid, n_calls, k_count = set(), 0, 0, {}
+    with open(out_path, "a") as f, open(rejected_path, "a") as rej:
+        while n_valid < target_valid and n_calls < max_calls:
+            n_calls += 1
             spec = sample_shape(rng)
-            resp = openai_client.chat.completions.create(
-                model=model, temperature=0.8, max_tokens=4000,
-                response_format={"type": "json_object"},
-                messages=[{"role": "user", "content": build_prompt(spec, rng, n=per_call)}])
             try:
+                resp = openai_client.chat.completions.create(
+                    model=model, temperature=0.8, max_tokens=4000,
+                    response_format={"type": "json_object"},
+                    messages=[{"role": "user", "content": build_prompt(spec, rng, n=per_call)}])
                 queries = json.loads(resp.choices[0].message.content)["queries"]
-            except (json.JSONDecodeError, KeyError):
+            except Exception as e:     # noqa: BLE001  (API error, bad JSON)
+                print(f"call {n_calls}: {e}")
                 continue
             for q in queries:
                 if not isinstance(q, dict) or "cypher" not in q:
                     continue
                 q["cypher"], q["boundary_limits"] = fill_limits(q["cypher"], rng)
-                f.write(json.dumps({"spec": spec.__dict__, **q}) + "\n")
+                q["cypher"], q["boundary_thresholds"] = fill_thresholds(q["cypher"], rng)
+                rec = {"spec": spec.__dict__, **q}
+                sig = _signature(q["cypher"])
+                try:
+                    if sig in seen:
+                        raise ValueError("duplicate")
+                    mq = decompose_multiseg(q["cypher"])
+                    if any("$" in st.limit + st.post_where for st in mq.stages):
+                        raise ValueError("unfilled boundary threshold")
+                except Exception as e:     # noqa: BLE001
+                    rej.write(json.dumps({**rec, "reason": str(e)}) + "\n")
+                    continue
+                seen.add(sig)
+                n_valid += 1
+                k_count[mq.k] = k_count.get(mq.k, 0) + 1
+                f.write(json.dumps(rec) + "\n")
+                f.flush()
+            print(f"call {n_calls}: {n_valid}/{target_valid} valid, k distribution {k_count}")
+    return n_valid
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +442,7 @@ def check_multiseg(query: str, expected_k: int = None) -> CheckResult:
     return result
 
 
-if __name__ == "__main__":
+def _selftest():
     for q in FEW_SHOT:
         r = check_multiseg(q)
         print(r.ok, r.reason, [(s.carried, sorted(s.pg_props)) for s in r.segments[:-1]])
@@ -409,7 +464,23 @@ RETURN o.name"""
     spec = sample_shape(rng)
     print(build_prompt(spec, rng))
 
-    # from openai import OpenAI
-    # client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-    # generate(client, "multiseg_llm.jsonl", num_calls=200, per_call=5)
-    # then: python multiseg_query_rewrite.py multiseg_llm.jsonl <out_prefix>
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="multi-segment CMGRJ workload generation")
+    ap.add_argument("--generate", action="store_true", help="call the LLM (needs OPENAI_API_KEY)")
+    ap.add_argument("--target", type=int, default=100, help="number of statically valid queries to collect")
+    ap.add_argument("--out", default="multiseg_llm.jsonl")
+    ap.add_argument("--model", default="gpt-4o")
+    ap.add_argument("--per-call", type=int, default=5)
+    ap.add_argument("--max-calls", type=int, default=300)
+    ap.add_argument("--seed", type=int, default=0)
+    a = ap.parse_args()
+    if not a.generate:
+        _selftest()
+    else:
+        from openai import OpenAI
+        generate(OpenAI(api_key=os.environ.get("OPENAI_API_KEY")), a.out, target_valid=a.target,
+                 per_call=a.per_call, max_calls=a.max_calls, seed=a.seed, model=a.model)
+        # next: python multiseg_query_rewrite.py <out> <prefix>; then system/multiseg_collect.py --precheck-only

@@ -168,13 +168,19 @@ class FakeNeo4j:
         return float(self.pg.run_query_return_result(f"select count(*) from ({sql}) x")[0][0])
 
     def run_query_stream(self, query, pg_util, max_records=None, table_name="neo4j", **kw):
-        sql = self.to_sql(query)
+        # like Neo4jUtil.run_query_stream: errors are logged and None is returned
+        try:
+            sql = self.to_sql(query)
+        except Exception:      # noqa: BLE001
+            return None
         pg_util.run_query(f'DROP TABLE IF EXISTS "{table_name}"')
         pg_util.run_query(f'CREATE TABLE "{table_name}" AS {sql}')
         n = pg_util.run_query_return_result(f'select count(*) from "{table_name}"')[0][0]
         return n
 
     def explain_query_plan(self, query):
+        # like EXPLAIN in Neo4j: raises on an invalid query (here: an untranslatable pattern)
+        self.to_sql(query)
         return "{}"
 
 
@@ -257,8 +263,64 @@ def main():
                  for c in sample]
         print(f"  composite plans: {len(comp)}; validation (composed vs real, s): "
               + ", ".join(f"{c['latency']:.3f}/{r:.3f}" for c, r in zip(sample, reals)))
+    failures += test_driver(make_executor)
     print("ALL OK" if failures == 0 else f"{failures} FAILURES")
     sys.exit(1 if failures else 0)
+
+
+def instantiate(q: str) -> str:
+    q = re.sub(r"LIMIT \$\w+", "LIMIT 15", q)
+    return re.sub(r"(>=?) \$n\b", r"\1 2", q)
+
+
+def test_driver(make_executor) -> int:
+    """precheck_query + collect_query as main() uses them, including deliberately broken queries."""
+    print("=== driver: precheck + consistency")
+    ex = make_executor()
+    fails = 0
+
+    def mq_of(q):
+        return json.loads(json.dumps(decompose_multiseg(instantiate(q)).__dict__, default=lambda o: o.__dict__))
+
+    def expect(name, cond):
+        nonlocal fails
+        fails += not cond
+        print(f"  {name}: {'OK' if cond else 'FAIL'}")
+
+    for qi, q in enumerate(FEW_SHOT):
+        mq = mq_of(q)
+        rep = mc.precheck_query(mq, ex, keep_params=False)
+        rec, _ = mc.collect_query(mq, ex, keep_params=False, repeat=1, dry_run=False)
+        expect(f"query {qi} passes precheck and is consistent",
+               rep["ok"] and rec["usable_for_training"] and all(c["latency"] is not None for c in rec["composite"]))
+
+    # 1) broken query: relationship type that does not exist -> precheck fails as a query error
+    mq = mq_of(FEW_SHOT[1])
+    mq["stages"][1]["cypher"] = mq["stages"][1]["cypher"].replace("HAS_TAG", "HAS_TAGG")
+    rep = mc.precheck_query(mq, ex, keep_params=False)
+    expect(f"invalid relationship type is caught ({rep['reason'][:50]}...)", not rep["ok"] and rep["kind"] == "query")
+
+    # 2) empty seg1: HAVING threshold no group can reach -> precheck fails
+    rep = mc.precheck_query(mq_of(FEW_SHOT[1].replace("localMembers > $n", "localMembers > 100000")), ex, False)
+    expect(f"empty intermediate result is caught ({rep['reason']})", not rep["ok"] and "empty" in rep["reason"])
+
+    # 3) rewrite bug in one plan (drops a join when Tag0 is moved) -> consistency check flags the query
+    orig = mc.SegmentRewriter.rewrite
+
+    def buggy(self, moved):
+        p = orig(self, moved)
+        if any(m.alias == "Tag0" for m in moved) and self.ps.idx == 2:
+            p.cypher = re.sub(r"\nAND [^\n]*|WHERE t\.id = t_tag0\.id( AND )?", lambda m: "WHERE " if m.group(1) else "", p.cypher)
+            p.cypher = p.cypher.replace("\nWHERE \nRETURN", "\nRETURN")
+        return p
+    mc.SegmentRewriter.rewrite = buggy
+    try:
+        mq = mq_of(FEW_SHOT[0])
+        rec, _ = mc.collect_query(mq, ex, keep_params=False, repeat=1, dry_run=False)
+    finally:
+        mc.SegmentRewriter.rewrite = orig
+    expect(f"rewrite bug is flagged ({rec['consistency'][1]})", rec["usable_for_training"] is False)
+    return fails
 
 
 if __name__ == "__main__":

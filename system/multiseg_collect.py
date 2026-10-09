@@ -306,12 +306,30 @@ def _rename_tables(sql: str, mapping: dict) -> str:
     return sql
 
 
+def py_checksum(rows) -> list:
+    """order-independent (count, hash) of a fetched result"""
+    import hashlib
+    h = 0
+    for r in rows or []:
+        d = hashlib.md5(str(tuple(str(x) for x in r)).encode()).digest()
+        h = (h + int.from_bytes(d[:8], "little")) % (1 << 63)
+    return [len(rows or []), h]
+
+
 class SegmentExecutor:
-    def __init__(self, executor, timeout_count=True, keep_result=False):
+    """Runs one segment plan and records component times, row counts, errors and an output checksum.
+
+    The original utils swallow errors (PostgresUtil logs and rolls back, run_query_stream returns None),
+    so errors are detected explicitly: a None from run_query_stream / run_query_return_result, or a
+    CREATE TABLE ... AS whose table does not exist afterwards.
+    """
+
+    def __init__(self, executor, timeout_count=True, keep_result=False, checksum=True):
         self.ex = executor            # utils.run_plan_util.RunPlan
         self.pg, self.nj = executor.pg_util, executor.neo4j_util
         self.timeout_count = timeout_count
-        self.keep_result = keep_result    # keep the last final result (tests / result checks)
+        self.keep_result = keep_result    # keep the last final result (tests)
+        self.checksum = checksum
         self.last_result = None
 
     def _timed(self, fn, *a, **kw):
@@ -319,46 +337,79 @@ class SegmentExecutor:
         out = fn(*a, **kw)
         return time.time() - t, out
 
+    def _exists(self, table: str) -> bool:
+        r = self.pg.run_query_return_result(f"select to_regclass('\"{table}\"')")
+        return bool(r and r[0][0])
+
+    def pg_checksum(self, table: str) -> list:
+        r = self.pg.run_query_return_result(
+            f'select count(*), coalesce(sum(hashtext(t::text)::bigint), 0) from "{table}" t')
+        return [int(r[0][0]), int(r[0][1]) % (1 << 63)] if r else None
+
     def run_graph(self, cypher: str, table: str):
-        """count check (like RunPlan.run_plan), then stream the result into `table`."""
+        """count check (like RunPlan.run_plan), then stream the result into `table`.
+        Returns (seconds, rows, status) with status in {ok, timeout, too_large, error}."""
         if self.timeout_count:
             try:
                 count_q = re.sub(r"(?is)\breturn\b.*$", "return count(*)", cypher)
                 size = self.nj.run_query_return_single_value(
                     f"CALL apoc.cypher.runTimeboxed(\"{count_q}\", {{}}, 240000)")
                 if size is None:
-                    return OUT_OF_TIME_QUERY_TIME, 0
+                    return OUT_OF_TIME_QUERY_TIME, 0, "timeout"
                 if size > MAX_RECORDS:
-                    return LARGE_QUERY_TIME, int(size)
-            except Exception as e:
+                    return LARGE_QUERY_TIME, int(size), "too_large"
+            except Exception as e:     # noqa: BLE001
                 logging.info(f"count query failed: {e}")
-                return OUT_OF_TIME_QUERY_TIME, 0
+                return OUT_OF_TIME_QUERY_TIME, 0, "error"
         self.pg.run_query(f'DROP TABLE IF EXISTS "{table}"')
-        t, rows = self._timed(self.nj.run_query_stream, cypher, self.pg, max_records=MAX_RECORDS, table_name=table)
-        return t, rows or 0
+        try:
+            t, rows = self._timed(self.nj.run_query_stream, cypher, self.pg, max_records=MAX_RECORDS,
+                                  table_name=table)
+        except Exception as e:         # noqa: BLE001  (DataTooLargeError etc.)
+            logging.info(f"graph query failed: {e}")
+            return LARGE_QUERY_TIME, 0, "error"
+        if rows is None:               # run_query_stream logs the exception and returns None
+            return LARGE_QUERY_TIME, 0, "error"
+        return t, rows, "ok"
 
     def run_plan(self, plan: SegmentPlan, output: str, last: bool, ra_table: str = None) -> dict:
-        tm = {}
+        tm = {"status": "ok"}
         labels = [l for _, l, _ in plan.move_base + plan.move_seg]
         try:
-            tm["pre_base"], _ = self._timed(self.ex.run_table_movement_query, plan.move_base)
-            tm["move_seg"], _ = self._timed(self.ex.run_table_movement_query, plan.move_seg)
-            tm["graph"], tm["graph_rows"] = self.run_graph(plan.cypher, "neo4j")
-            if tm["graph"] >= LARGE_QUERY_TIME:
-                tm["timeout"] = True
+            try:
+                tm["pre_base"], _ = self._timed(self.ex.run_table_movement_query, plan.move_base)
+                tm["move_seg"], _ = self._timed(self.ex.run_table_movement_query, plan.move_seg)
+            except Exception as e:     # noqa: BLE001
+                tm.update(status="error", error=f"table movement: {e}")
+                return tm
+            tm["graph"], tm["graph_rows"], st = self.run_graph(plan.cypher, "neo4j")
+            if st != "ok":
+                tm.update(status=st, timeout=st in ("timeout", "too_large"))
+                if st == "error":
+                    tm["error"] = "graph query"
                 return tm
             if tm["graph_rows"] == 0:
-                # empty graph result -> empty query result; the workload filter should have removed such queries
-                tm["sql"], tm["sql_rows"], tm["empty"] = 0.0, 0, True
+                # empty graph result -> empty query result; the precheck removes such queries
+                tm.update(sql=0.0, sql_rows=0, status="empty", checksum=[0, 0])
                 return tm
             target = ra_table if plan.split else (None if last else output)
             if target:
                 self.pg.run_query(f'DROP TABLE IF EXISTS "{target}"')
                 tm["sql"], _ = self._timed(self.pg.run_query, f'CREATE TABLE "{target}" AS\n{plan.sql}')
+                if not self._exists(target):
+                    tm.update(status="error", error="sql")
+                    return tm
                 tm["sql_rows"] = self.pg.run_query_return_result(f'select count(*) from "{target}"')[0][0]
+                if self.checksum:
+                    tm["checksum"] = self.pg_checksum(target)
             else:
                 tm["sql"], res = self._timed(self.pg.run_query_return_result, plan.sql)
-                tm["sql_rows"] = 0 if res is None else len(res)
+                if res is None:
+                    tm.update(status="error", error="sql")
+                    return tm
+                tm["sql_rows"] = len(res)
+                if self.checksum:
+                    tm["checksum"] = py_checksum(res)
                 if self.keep_result:
                     self.last_result = res
         finally:
@@ -366,16 +417,22 @@ class SegmentExecutor:
         return tm
 
     def run_rib(self, sql: str, output: str, last: bool) -> dict:
-        if not self.pg.run_query_return_result(f"select to_regclass('{re.search(r'from (\w+) ra', sql).group(1)}')")[0][0]:
-            return {"rib": 0.0, "rows": 0, "empty": True}
+        ra = re.search(r"from (\w+) ra", sql).group(1)
+        if not self._exists(ra):
+            return {"rib": 0.0, "rows": 0, "status": "error", "error": f"{ra} missing"}
         if last:
             t, res = self._timed(self.pg.run_query_return_result, sql)
+            if res is None:
+                return {"rib": t, "rows": 0, "status": "error", "error": "sql"}
             if self.keep_result:
                 self.last_result = res
-            return {"rib": t, "rows": 0 if res is None else len(res)}
+            return {"rib": t, "rows": len(res), "status": "ok", "checksum": py_checksum(res) if self.checksum else None}
         self.pg.run_query(f'DROP TABLE IF EXISTS "{output}"')
         t, _ = self._timed(self.pg.run_query, f'CREATE TABLE "{output}" AS\n{sql}')
-        return {"rib": t, "rows": self.pg.run_query_return_result(f'select count(*) from "{output}"')[0][0]}
+        if not self._exists(output):
+            return {"rib": t, "rows": 0, "status": "error", "error": "sql"}
+        return {"rib": t, "rows": self.pg.run_query_return_result(f'select count(*) from "{output}"')[0][0],
+                "status": "ok", "checksum": self.pg_checksum(output) if self.checksum else None}
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +444,8 @@ def _cap(t):
 
 def segment_cost(p: dict) -> dict:
     t = p["timings"]
+    if t.get("status") == "error":
+        return {"error": True}
     if t.get("timeout"):
         return {"timeout": True}
     return {"pre_base": t.get("pre_base", 0), "move_seg": t.get("move_seg", 0),
@@ -397,10 +456,13 @@ def compose(stage_plans: list, rib: list) -> list:
     """stage_plans[i]: list of plan dicts (with timings) for segment i; rib[i]: R_ib time (i>0)."""
     out = []
     for combo in itertools.product(*[range(len(s)) for s in stage_plans]):
-        end, timeout = 0.0, False
+        end, timeout, error = 0.0, False, False
         for i, pi in enumerate(combo):
             p = stage_plans[i][pi]
             c = segment_cost(p)
+            if c.get("error"):
+                error = True
+                break
             if c.get("timeout"):
                 timeout = True
                 break
@@ -410,8 +472,11 @@ def compose(stage_plans: list, rib: list) -> list:
                 end = max(end, c["pre_base"]) + c["move_seg"] + c["graph"] + c["sql"]
             else:
                 end = max(end, c["pre_base"] + c["graph"] + c["sql"]) + rib[i]
-        out.append({"combo": list(combo), "latency": OUT_OF_TIME_QUERY_TIME if timeout else _cap(end),
-                    "timeout": timeout})
+        if error:
+            out.append({"combo": list(combo), "latency": None, "timeout": False, "error": True})
+        else:
+            out.append({"combo": list(combo), "latency": OUT_OF_TIME_QUERY_TIME if timeout else _cap(end),
+                        "timeout": timeout})
     return out
 
 
@@ -484,12 +549,67 @@ def run_composite(make_executor, rewriters, plans_by_stage, combo, outputs) -> f
 # ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
-def collect_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, repeat: int, dry_run: bool):
+def build_rewriters(mq: dict, keep_params: bool):
     stages = [Stage(**s) for s in mq["stages"]]
     k = len(stages)
     parsed = [parse_stage(st, i + 1) for i, st in enumerate(stages)]
-    rewriters = [SegmentRewriter(ps, i == k - 1, keep_params) for i, ps in enumerate(parsed)]
-    plans_by_stage, rib_time, rib_rec, raw_plans = [], [0.0] * k, {}, []
+    return stages, [SegmentRewriter(ps, i == k - 1, keep_params) for i, ps in enumerate(parsed)]
+
+
+def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_seconds: float = None) -> dict:
+    """Cheap validity check before the full collection (one execution per segment).
+
+    1. EXPLAIN every candidate plan's Cypher (nothing is executed). A failure on the canonical plan means
+       the query is wrong; a failure on another plan means a rewrite bug.
+    2. Execute the canonical plan (nothing moved) segment by segment, plus R_ib.
+       Fails on: error, timeout, empty graph result, empty seg{i} or final result, too slow.
+    """
+    stages, rws = build_rewriters(mq, keep_params)
+    rep = {"ok": False, "reason": "", "kind": "", "segments": [], "seconds": 0.0}
+    for i, rw in enumerate(rws):
+        for j, p in enumerate(rw.plans()):
+            try:
+                seg_ex.nj.explain_query_plan(p.cypher)
+            except Exception as e:     # noqa: BLE001
+                rep.update(reason=f"segment {i + 1} plan {p.moved}: EXPLAIN failed: {e}",
+                           kind="query" if j == 0 else "rewrite")
+                return rep
+    k = len(stages)
+    for i, rw in enumerate(rws):
+        last = i == k - 1
+        p0 = rw.rewrite([])
+        tm = seg_ex.run_plan(p0, stages[i].output, last, ra_table=f"r{i + 1}a")
+        seg = {"segment": i + 1, "graph_rows": tm.get("graph_rows"), "status": tm["status"]}
+        rep["seconds"] += sum(tm.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql"))
+        if tm["status"] != "ok":
+            rep["segments"].append(seg)
+            rep.update(reason=f"segment {i + 1}: {tm['status']} {tm.get('error', '')}".strip(), kind="query")
+            return rep
+        rows = tm["sql_rows"]
+        if p0.split:
+            rb = seg_ex.run_rib(rw.rib_sql(f"r{i + 1}a"), stages[i].output, last)
+            rep["seconds"] += rb["rib"]
+            if rb["status"] != "ok":
+                rep["segments"].append(seg)
+                rep.update(reason=f"segment {i + 1} R_ib: {rb.get('error')}", kind="query")
+                return rep
+            rows = rb["rows"]
+        seg["output_rows"] = rows
+        rep["segments"].append(seg)
+        if rows == 0:
+            rep.update(reason=f"segment {i + 1}: empty {'result' if last else stages[i].output}", kind="query")
+            return rep
+    if max_seconds and rep["seconds"] > max_seconds:
+        rep.update(reason=f"canonical plan too slow ({rep['seconds']:.1f}s)", kind="query")
+        return rep
+    rep["ok"] = True
+    return rep
+
+
+def collect_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, repeat: int, dry_run: bool):
+    stages, rewriters = build_rewriters(mq, keep_params)
+    k = len(stages)
+    plans_by_stage, rib_time, rib_rec, raw_plans, consistency = [], [0.0] * k, {}, [], []
     # segments are processed in order so that seg{i-1} is materialised before segment i's moved-seg plans
     for i, rw in enumerate(rewriters):
         last = i == k - 1
@@ -510,6 +630,16 @@ def collect_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, repeat: 
                 rib_rec[i + 1].update(_median_timings(runs))
                 rib_time[i] = rib_rec[i + 1]["rib"]
         if not dry_run:
+            # every plan of a segment must produce the same output (seg{i} / final result; R_ia separately)
+            ok = [r for r in recs if r["timings"].get("status") == "ok"]
+            full = {tuple(r["timings"]["checksum"]) for r in ok if not r["split"] and r["timings"].get("checksum")}
+            if rib_rec.get(i + 1, {}).get("checksum"):
+                full.add(tuple(rib_rec[i + 1]["checksum"]))
+            ra = {tuple(r["timings"]["checksum"]) for r in ok if r["split"] and r["timings"].get("checksum")}
+            errors = [{"moved": r["moved"], "error": r["timings"].get("error")} for r in recs
+                      if r["timings"].get("status") == "error"]
+            consistency.append({"segment": i + 1, "distinct_outputs": len(full), "distinct_r_a": len(ra),
+                                "plan_errors": errors})
             try:
                 raw_plans.append(seg_ex.nj.explain_query_plan(stages[i].cypher))
             except Exception as e:     # noqa: BLE001
@@ -518,8 +648,11 @@ def collect_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, repeat: 
         plans_by_stage.append(recs)
     composite = [] if dry_run else compose(plans_by_stage, rib_time)
     n_exec = sum(len(s) for s in plans_by_stage) + len(rib_rec)
+    usable = all(c["distinct_outputs"] <= 1 and c["distinct_r_a"] <= 1 and not c["plan_errors"]
+                 for c in consistency)
     return {"original": mq["original"], "k": k, "segments": plans_by_stage, "rib": rib_rec,
-            "neo4j_raw_plans": raw_plans, "composite": composite, "executions": n_exec}, rewriters
+            "neo4j_raw_plans": raw_plans, "composite": composite, "executions": n_exec,
+            "consistency": consistency, "usable_for_training": usable if not dry_run else None}, rewriters
 
 
 def _median_timings(runs: list) -> dict:
@@ -542,6 +675,11 @@ def main():
     ap.add_argument("--keep-params", action="store_true", help="execute $param predicates (instantiated queries)")
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--validate", type=int, default=0, help="composite plans per query to run end-to-end")
+    ap.add_argument("--precheck-only", action="store_true",
+                    help="only run the cheap precheck; write the passing queries to precheck_passed.jsonl")
+    ap.add_argument("--no-precheck", action="store_true", help="skip the precheck before collection")
+    ap.add_argument("--max-precheck-seconds", type=float, default=None,
+                    help="drop queries whose canonical plan takes longer than this")
     ap.add_argument("--nj-uri", default="localhost")
     ap.add_argument("--nj-db", default="neo4j")
     ap.add_argument("--nj-user", default="neo4j")
@@ -570,17 +708,36 @@ def main():
 
     queries = [json.loads(l) for l in open(args.queries)]
     out_path = os.path.join(args.result_dir, "multiseg_plans_with_runtime.jsonl")
-    with open(out_path, "w") as out:
+    pre_path = os.path.join(args.result_dir, "precheck_report.jsonl")
+    passed_path = os.path.join(args.result_dir, "precheck_passed.jsonl")
+    summary = {"queries": len(queries), "skipped_params": 0, "precheck_failed_query": 0,
+               "precheck_failed_rewrite": 0, "collected": 0, "inconsistent_or_plan_errors": 0}
+    with open(out_path, "w") as out, open(pre_path, "w") as pre, open(passed_path, "w") as passed:
         for qi, mq in enumerate(queries):
             logging.info(f"============= query {qi} =============")
             if any("$" in st["cypher"] for st in mq["stages"]):
                 # a predicate on a graph-resident property (id) is left in the Cypher and needs a value
                 print(f"[skip] query {qi}: Cypher still contains $params; instantiate it first")
+                summary["skipped_params"] += 1
                 continue
             if any("$" in st[f] for st in mq["stages"] for f in ("post_where", "order_by", "limit")):
                 # LIMIT / HAVING-style thresholds define the query and cannot be dropped like $param filters
                 print(f"[skip] query {qi}: boundary LIMIT/threshold still has $params; instantiate it first")
+                summary["skipped_params"] += 1
                 continue
+            if not args.dry_run and not args.no_precheck:
+                rep = precheck_query(mq, seg_ex, args.keep_params, args.max_precheck_seconds)
+                rep["query_id"] = qi
+                pre.write(json.dumps(rep) + "\n")
+                pre.flush()
+                if not rep["ok"]:
+                    summary[f"precheck_failed_{rep['kind']}"] += 1
+                    print(f"[precheck] query {qi} dropped ({rep['kind']}): {rep['reason']}")
+                    continue
+                passed.write(json.dumps(mq) + "\n")
+                passed.flush()
+                if args.precheck_only:
+                    continue
             rec, rewriters = collect_query(mq, seg_ex, args.keep_params, args.repeat, args.dry_run)
             rec["query_id"] = qi
             if args.dry_run:
@@ -590,18 +747,22 @@ def main():
                     total *= n
                 print(f"=== query {qi}: k={rec['k']}, plans per segment {sizes}, "
                       f"composite plans {total}, executions {rec['executions']}")
+            else:
+                summary["collected"] += 1
+                if not rec["usable_for_training"]:
+                    summary["inconsistent_or_plan_errors"] += 1
+                    print(f"[warn] query {qi}: plan outputs differ or plans failed: {rec['consistency']}")
             if args.validate and not args.dry_run and rec["composite"]:
                 outputs = [s["output"] for s in mq["stages"]]
-                sample = random.sample(rec["composite"], min(args.validate, len(rec["composite"])))
+                cands = [c for c in rec["composite"] if not c["timeout"] and not c.get("error")]
                 rec["validation"] = []
-                for c in sample:
-                    if c["timeout"]:
-                        continue
+                for c in random.sample(cands, min(args.validate, len(cands))):
                     real = run_composite(make_executor, rewriters, rec["segments"], c["combo"], outputs)
                     rec["validation"].append({"combo": c["combo"], "composed": c["latency"], "real": real})
             out.write(json.dumps(rec) + "\n")
             out.flush()
-    print(f"wrote {out_path}")
+    print(json.dumps(summary, indent=1))
+    print(f"wrote {out_path}" + ("" if args.dry_run else f", {pre_path}, {passed_path}"))
 
 
 if __name__ == "__main__":

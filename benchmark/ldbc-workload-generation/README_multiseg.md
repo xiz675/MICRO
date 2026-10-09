@@ -12,12 +12,33 @@ and is rejected, so every query in the workload is irreducible to a single-segme
 
 ## Pipeline
 
-| Step | Script | Output |
+```bash
+cd benchmark/ldbc-workload-generation
+# 1. generate until 100 queries pass the static checker + decomposition (needs OPENAI_API_KEY)
+python llm_multiseg_generation.py --generate --target 100 --out multiseg_llm.jsonl
+#    rejected queries and reasons: multiseg_llm_rejected.jsonl
+# 2. (optional) edge-direction correction as before: llm_workload_correction.py
+# 3. deterministic decomposition
+python multiseg_query_rewrite.py multiseg_llm.jsonl out/
+# 4. precheck on the real databases (EXPLAIN every plan + one canonical execution per query)
+cd ../../system
+python multiseg_collect.py ../benchmark/ldbc-workload-generation/out/multiseg_queries.jsonl res/ \
+    --precheck-only --nj-uri ... --pg-db t1 --pg-pw ...
+# 5. full collection on the queries that passed (the precheck runs again unless --no-precheck)
+python multiseg_collect.py res/precheck_passed.jsonl res/ --no-precheck --validate 3 --nj-uri ... --pg-db t1 ...
+```
+
+Generation fills LIMIT values from tiers (10/100/1000/10000) and HAVING thresholds on `count`
+aggregates from tiers (2/3/5/10/20); thresholds on avg/min/max are not filled (the prompt asks for
+top-k there) and such queries are rejected. Structural duplicates are rejected.
+
+Checks:
+
+| Layer | Where | Catches |
 |---|---|---|
-| 1. LLM generation (shape spec sampled per call, LIMIT tiers filled by script) | `llm_multiseg_generation.py` → `generate()` | `multiseg_llm.jsonl` |
-| 2. Edge-direction correction (unchanged) | `llm_workload_correction.py` | |
-| 3. Deterministic decomposition + validation | `python multiseg_query_rewrite.py multiseg_llm.jsonl <prefix>` | `<prefix>multiseg_queries.{jsonl,txt}`, `<prefix>multiseg_queries_full.sql` |
-| 4. Segment-wise plan timing + offline composition | `python ../../system/multiseg_collect.py <prefix>multiseg_queries.jsonl <result_dir>` | `multiseg_plans_with_runtime.jsonl` |
+| static | generation (`check_multiseg` + `decompose_multiseg`) | wrong shape, foldable boundary, forbidden constructs, duplicates |
+| precheck | `multiseg_collect.py` (`precheck_query`) | invalid Cypher/SQL on the real schema (`kind=query`), Cypher of a rewritten plan failing EXPLAIN (`kind=rewrite`), errors, timeouts, empty seg{i}/result, too slow (`--max-precheck-seconds`) |
+| consistency | `multiseg_collect.py` (`collect_query`) | plans of a segment with different outputs (checksum), plans failing although the canonical plan ran -> `usable_for_training=false` |
 
 ## Decomposed form
 
