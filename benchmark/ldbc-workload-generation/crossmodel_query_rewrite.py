@@ -9,13 +9,24 @@ from utils.query_stats_util import Stats, CypherStats, SQLStats, get_path_len
 from utils.sql_rewrite_util import RelationComponent, Table, RelationComponentWithPGProp
 
 
+def replace_with_random_choice(text, substring, replacements):
+    # was used below but only defined in realdata-workload-generation; defined here so the else-branch works
+    return re.sub(substring, random.choice(replacements), text)
+
+
 def reformulate_cypher(remaining_clauses: list[Clause]):
     return "\n".join([i.get_clause_text() for i in remaining_clauses])
 
 
 # return the formulated sql query and sql stats
 def reformulate_sql(sql_select_components: list[RelationComponent], sql_predicates: list[RelationComponent],
-                    group_by_components: list[RelationComponent], var_to_return):
+                    group_by_components: list[RelationComponent], var_to_return,
+                    extra_from: list[str] = None, extra_where: list[str] = None):
+    """
+    extra_from / extra_where are used by the multi-segment decomposer to join the graph result of
+    segment i with the output of segment i-1 (e.g. extra_from=["seg1"],
+    extra_where=["neo4j.fid = seg1.fid"]). With both None the output is identical to before.
+    """
     # get var_name and table alias: Variable to Table
     # Variable to Table
     var_to_table = {}
@@ -24,24 +35,24 @@ def reformulate_sql(sql_select_components: list[RelationComponent], sql_predicat
     join_predicates = []
 
     for var in var_to_return:
-        var_label = var.variable_label
+        # subset labels such as Person1/Forum2 map to the base table
+        var_label = re.sub(r'\d+$', '', var.variable_label)
         table_alias = var_label + str(table_alias_num[var_label])
         table_alias_num[var_label] += 1
         # table name is the node label name
         var_to_table[var] = Table(var_label, table_alias)
         join_predicates.append(f"neo4j.{var.variable_name}id = {table_alias}.id")
+    join_predicates.extend(extra_where or [])
 
-    all_tables = var_to_table.values()
+    from_items = [f"{i.table_name} {i.table_alias}" for i in var_to_table.values()] + list(extra_from or [])
 
     select_clause = "select " + ", ".join([i.to_sql(var_to_table) for i in sql_select_components]) + "\n"
-    from_clause = "from neo4j," + ", ".join([f"{i.table_name} {i.table_alias}" for i in all_tables]) + "\n"
-    where_clause = "where "
-    having_predicate = False
-    if len(sql_predicates) > 0:
-        where_clause = where_clause + " and ".join([i.to_sql(var_to_table) for i in sql_predicates])
-        having_predicate = True
-    if len(join_predicates) > 0:
-        if having_predicate:
+    from_clause = ("from neo4j," + ", ".join(from_items) if from_items else "from neo4j") + "\n"
+    predicates = [i.to_sql(var_to_table) for i in sql_predicates]
+    where_clause = ""
+    if predicates or join_predicates:
+        where_clause = "where " + " and ".join(predicates)
+        if predicates and join_predicates:
             where_clause = where_clause + " and "
         where_clause = where_clause + " and ".join(join_predicates) + "\n"
     group_by_clause = ""
@@ -77,7 +88,13 @@ def modify_cypher_node_labels(cypher_query):
     return cypher_query
 
 
-def rewrite_cypher_to_cypher_and_sql(query: str, prop_mapping: dict):
+def rewrite_cypher_to_cypher_and_sql(query: str, prop_mapping: dict, modify_labels: bool = True,
+                                     extra_from: list[str] = None, extra_where: list[str] = None):
+    """
+    modify_labels=False is used by the multi-segment decomposer, which assigns subset labels
+    (Person1, Forum2, ...) once for the whole query so that a variable carried across segments keeps
+    the same label. extra_from/extra_where are passed through to reformulate_sql.
+    """
     # a list of stats collected
     sql_stats = SQLStats()
     cypher_stats = CypherStats()
@@ -299,8 +316,9 @@ def rewrite_cypher_to_cypher_and_sql(query: str, prop_mapping: dict):
         sql_stats.touch_table(var.variable_label)
 
     cypher_query = reformulate_cypher(remaining_clauses)
-    modified_cypher_query = modify_cypher_node_labels(cypher_query)
-    sql_query = reformulate_sql(sql_select_components, sql_where_predicates, group_by_components, var_to_return)
+    modified_cypher_query = modify_cypher_node_labels(cypher_query) if modify_labels else cypher_query
+    sql_query = reformulate_sql(sql_select_components, sql_where_predicates, group_by_components, var_to_return,
+                                extra_from, extra_where)
     stats = Stats(sql_stats, cypher_stats)
     return modified_cypher_query, sql_query, stats
 
