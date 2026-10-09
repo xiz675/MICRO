@@ -819,6 +819,9 @@ def main():
     ap.add_argument("--reset-persistent", action="store_true",
                     help="delete the persistent base-table nodes first (e.g. after switching T1/T2 or a Neo4j reload)")
     ap.add_argument("--drop-persistent-at-end", action="store_true")
+    ap.add_argument("--shard", default=None,
+                    help="i/n: run only shard i (0-based) of n, for splitting a workload across machines; queries "
+                         "are balanced by their number of segment-plan executions")
     ap.add_argument("--max-precheck-seconds", type=float, default=None,
                     help="drop queries whose canonical plan takes longer than this")
     ap.add_argument("--nj-uri", default="localhost")
@@ -854,6 +857,24 @@ def main():
                 seg_ex.mover.drop_persistent()
 
     queries = [json.loads(l) for l in open(args.queries)]
+    ids = list(range(len(queries)))
+    if args.shard:
+        i, n = (int(x) for x in args.shard.split("/"))
+        # greedy balance: most expensive queries first, each to the currently lightest shard
+        cost = []
+        for qi, mq in enumerate(queries):
+            try:
+                _, rws = build_rewriters(mq, args.keep_params)
+                cost.append((sum(2 ** len(rw.ps.joins) for rw in rws), qi))
+            except Exception:      # noqa: BLE001
+                cost.append((1, qi))
+        load, assign = [0] * n, {}
+        for c, qi in sorted(cost, reverse=True):
+            j = load.index(min(load))
+            assign[qi], load[j] = j, load[j] + c
+        ids = [qi for qi in ids if assign[qi] == i]
+        print(f"shard {i}/{n}: {len(ids)} queries, {load[i]} segment-plan executions "
+              f"(all shards: {load})")
     out_path = os.path.join(args.result_dir, "multiseg_plans_with_runtime.jsonl")
     pre_path = os.path.join(args.result_dir, "precheck_report.jsonl")
     passed_path = os.path.join(args.result_dir, "precheck_passed.jsonl")
@@ -862,7 +883,8 @@ def main():
                "collection_seconds": 0.0}
     to_validate = []
     with open(out_path, "w") as out, open(pre_path, "w") as pre, open(passed_path, "w") as passed:
-        for qi, mq in enumerate(queries):
+        for qi in ids:
+            mq = queries[qi]
             logging.info(f"============= query {qi} =============")
             if any("$" in st["cypher"] for st in mq["stages"]):
                 # a predicate on a graph-resident property (id) is left in the Cypher and needs a value

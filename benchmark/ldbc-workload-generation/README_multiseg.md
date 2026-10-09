@@ -28,6 +28,11 @@ python multiseg_collect.py ../benchmark/ldbc-workload-generation/out/multiseg_qu
 python multiseg_collect.py res/precheck_passed.jsonl res/ --no-precheck --validate 3 --nj-uri ... --pg-db t1 ...
 ```
 
+Running on several machines: give every node the same `precheck_passed.jsonl` and run shard i of n
+(`--shard 0/5` ... `--shard 4/5`); queries are balanced by their number of segment-plan executions.
+Use the same hardware type and the same deployment on all nodes (movement times are measured per node,
+`movement_cache.json` is node-local); concatenate the `multiseg_plans_with_runtime.jsonl` files afterwards.
+
 Generation fills LIMIT values from tiers (10/100/1000/10000) and HAVING thresholds on `count`
 aggregates from tiers (2/3/5/10/20); thresholds on avg/min/max are not filled (the prompt asks for
 top-k there) and such queries are rejected. Structural duplicates are rejected.
