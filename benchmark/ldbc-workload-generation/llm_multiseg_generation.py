@@ -28,6 +28,11 @@ import random
 import re
 from dataclasses import dataclass, field
 
+import sys as _sys
+_sys_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # benchmark/ (utils)
+if _sys_path not in _sys.path:
+    _sys.path.insert(0, _sys_path)
+
 from llm_workload_generation import extended_rel_map as _icde_extended_rel_map
 
 # Relationships used for the prompt and for edge-direction correction. The ICDE map lists the LDBC
@@ -136,16 +141,39 @@ def sample_shape(rng: random.Random, k: int = None) -> ShapeSpec:
     )
 
 
+# Sizes of the static LDBC dimensions (the same at every scale factor). A boundary `LIMIT` on a grouping
+# variable of one of these labels is capped below its size: e.g. `LIMIT 1000` on Country (111 nodes)
+# would keep every group and the boundary would not reduce anything. Other labels grow with the scale
+# factor and use LIMIT_TIERS unchanged.
+LABEL_CARDINALITY = {"Continent": 6, "Country": 111, "City": 1343, "Place": 1460, "TagClass": 71,
+                     "Tag": 16080, "University": 6380, "Company": 1575, "Organisation": 7955}
+
+
+def limit_candidates(label: str) -> list:
+    card = LABEL_CARDINALITY.get(re.sub(r"\d+$", "", label or ""))
+    if card is None:
+        return LIMIT_TIERS
+    tiers = [t for t in LIMIT_TIERS if t <= card / 2]
+    if len(tiers) >= 2:
+        return tiers
+    return sorted({max(1, round(card * f)) for f in (0.05, 0.2, 0.5)})     # e.g. Country: 6, 22, 56
+
+
 def fill_limits(cypher: str, rng: random.Random) -> tuple[str, list]:
-    """Replace every `LIMIT $x` in boundaries with a sampled tier; the final RETURN LIMIT is kept small."""
+    """Replace every `LIMIT $x` in boundaries with a sampled tier (capped by the size of the grouping
+    variable's label, see LABEL_CARDINALITY); the final RETURN LIMIT is kept small."""
     chosen = []
+    labels = _var_labels(cypher)
     parts = re.split(r"(?i)(\breturn\b)", cypher, maxsplit=1)
 
-    def _sub(m):
-        v = rng.choice(LIMIT_TIERS)
-        chosen.append(v)
-        return f"LIMIT {v}"
-    head = re.sub(r"(?i)LIMIT\s+\$\w+", _sub, parts[0])
+    def _with(m):
+        def _sub(_):
+            v = rng.choice(limit_candidates(labels.get(m.group(1))))
+            chosen.append(v)
+            return f"LIMIT {v}"
+        return re.sub(r"(?i)LIMIT\s+\$\w+", _sub, m.group(0))
+    # each boundary: `WITH <group var>, ... LIMIT $k` (up to the next MATCH)
+    head = re.sub(r"(?is)\bWITH\s+(?:DISTINCT\s+)?(\w+)(?:(?!\bMATCH\b).)*", _with, parts[0])
     tail = re.sub(r"(?i)LIMIT\s+\$\w+", "LIMIT 20", "".join(parts[1:]))
     return head + tail, chosen
 
@@ -259,10 +287,28 @@ def fill_thresholds(cypher: str, rng: random.Random) -> tuple[str, list]:
 
 
 def _signature(cypher: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"\$\w+|\b\d+\b", "?", cypher)).strip().lower()
+    """Structure of a query: variable names, aliases, constants and arrow heads are ignored, so a query
+    that only renames things (or copies a prompt example with other parameter names) is a duplicate."""
+    q = re.sub(r"(?i)\s+AS\s+\w+", "", cypher)
+    names = set(_var_labels(cypher)) | set(re.findall(r"(?i)\bAS\s+(\w+)", cypher))
+    for v in sorted(names, key=len, reverse=True):
+        q = re.sub(rf"(?<![.:\w$]){re.escape(v)}\b", "v", q)
+    q = re.sub(r"\$\w+|\b\d+\b", "?", q)
+    q = q.replace("<-", "-").replace("->", "-")
+    return re.sub(r"\s+", " ", q).strip().lower()
 
 
-DEFAULT_MODEL = "gpt-5.1"
+def _prompt_example_signatures() -> set:
+    body = PROMPT_TEMPLATE.split("Common mistakes")[1].split("Examples of the expected style")[0]
+    right = []
+    for block in body.split("RIGHT, ")[1:]:
+        lines = [ln for ln in block.split("\n")[1:] if ln.startswith("  ")]    # the indented query lines
+        if lines and "MATCH" in lines[0]:
+            right.append("\n".join(lines))
+    return {_signature(q) for q in FEW_SHOT + right}
+
+
+DEFAULT_MODEL = "gpt-5.5"
 
 
 def is_reasoning_model(model: str) -> bool:
@@ -294,6 +340,10 @@ def generate(openai_client, out_path: str, target_valid: int = 100, per_call: in
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     rejected_path = rejected_path or out_path.replace(".jsonl", "") + "_rejected.jsonl"
     seen, n_valid, n_calls, k_count = set(), 0, 0, {}
+    examples = _prompt_example_signatures()
+    if os.path.exists(out_path):          # appending to an earlier run: keep deduplicating against it
+        with open(out_path) as prev:
+            seen |= {_signature(json.loads(line)["cypher"]) for line in prev if line.strip()}
     with open(out_path, "a") as f, open(rejected_path, "a") as rej:
         while n_valid < target_valid and n_calls < max_calls:
             n_calls += 1
@@ -326,6 +376,8 @@ def generate(openai_client, out_path: str, target_valid: int = 100, per_call: in
                 rec = {"spec": spec.__dict__, **q}
                 sig = _signature(q["cypher"])
                 try:
+                    if sig in examples:
+                        raise ValueError("copies a prompt example")
                     if sig in seen:
                         raise ValueError("duplicate")
                     mq = decompose_multiseg(q["cypher"])
