@@ -262,7 +262,7 @@ def _signature(cypher: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"\$\w+|\b\d+\b", "?", cypher)).strip().lower()
 
 
-DEFAULT_MODEL = "gpt-5.1"
+DEFAULT_MODEL = "gpt-5.5"
 
 
 def is_reasoning_model(model: str) -> bool:
