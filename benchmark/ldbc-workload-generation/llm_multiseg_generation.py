@@ -171,6 +171,7 @@ RETURN p.id, p.firstName, count(q) AS friendCount""",
     """MATCH (f:Forum)-[:CONTAINER_OF]->(m:Post)-[:HAS_TAG]->(t:Tag {name: $tag})
 WITH f, avg(m.length) AS avgLen ORDER BY avgLen DESC LIMIT $k
 MATCH (f)-[:HAS_MODERATOR]->(md:Person)-[:STUDY_AT]->(u:University)
+WHERE md.gender = $gender
 RETURN u.name, count(DISTINCT f) AS forumCount""",
 ]
 
@@ -185,7 +186,7 @@ Hard rules (a query violating any rule is discarded):
 1. Read-only. Use only MATCH, WHERE, WITH, ORDER BY, LIMIT, RETURN. No OPTIONAL MATCH, UNWIND, CALL, subqueries, EXISTS, or list comprehensions.
 2. Segments are separated by WITH. Each boundary WITH must contain an aggregation (count/avg/min/max/sum) and may be followed by WHERE on the aggregate or ORDER BY ... LIMIT. WHERE and ORDER BY after a WITH or RETURN may only refer to aliases defined in that WITH/RETURN (e.g. `ORDER BY postCount DESC`), never to `var.property`.
 3. After a WITH, ONLY the variables listed in that WITH exist. Segment i+1 must start from a node variable listed in the preceding WITH, written without a label, e.g. after `WITH f, count(m) AS c` write `MATCH (f)-[...]->...`. Any other variable from segment i (e.g. `p`) no longer exists: writing `MATCH (p)` would create a new, unrelated variable.
-4. Segment 1 must filter on a node property other than `id` BEFORE its WITH, either inline (`(t:Tag {{name: $tag}})`) or in a WHERE (`WHERE p.birthday > $date`), or its WITH must aggregate a property other than `id` (e.g. `avg(m.length)`). Counting nodes alone (`count(p)` with no property filter) is not enough. Every later segment must also contain at least one such property predicate.
+4. Segment 1 must filter on a node property other than `id` BEFORE its WITH, either inline (`(t:Tag {{name: $tag}})`) or in a WHERE (`WHERE p.birthday > $date`), or its WITH must aggregate a property other than `id` (e.g. `avg(m.length)`). Counting nodes alone (`count(p)` with no property filter) is not enough. Every later segment must ALSO filter on a non-id property of one of its own nodes in its MATCH/WHERE (returning a property in RETURN does not count).
 5. Never filter on `id`. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels and properties from the schema, and every relationship must point in exactly the direction listed in the schema (e.g. `(c:Comment)-[:HAS_CREATOR]->(p:Person)`, never `(p:Person)-[:HAS_CREATOR]-(c:Comment)` or `(p)-[:HAS_CREATOR]->(c)`). There are no relationship properties.
 6. Use $placeholders for every constant, including LIMIT ($k) and thresholds ($n). Do not use equality on datetime properties. Do not use STARTS WITH, ENDS WITH, CONTAINS or regex.
 7. The queries must be semantically meaningful: each stage should narrow down or rank entities that the next stage explores. Write a one-sentence natural-language description for each.
@@ -457,6 +458,12 @@ def check_multiseg(query: str, expected_k: int = None) -> CheckResult:
     if expected_k is not None and k != expected_k:
         result.reason = f"expected {expected_k} segments, got {k}"
         return result
+    # every later segment must itself be cross-model: a predicate on a table-resident property in its MATCH
+    # part (otherwise its SQL has no base table and the segment is graph-only apart from the seg join)
+    for i, seg in enumerate(segments[1:], start=2):
+        if not _pg_props(seg.match_text, labels):
+            result.reason = f"segment {i} has no table-resident predicate (no SQL part)"
+            return result
     for i, seg in enumerate(segments[:-1]):
         if not seg.blocking:
             result.reason = f"boundary {i + 1} not blocking (foldable)"
