@@ -27,6 +27,10 @@ import sys
 from collections import Counter
 from dataclasses import dataclass, field, asdict
 
+_sys_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # benchmark/ (utils)
+if _sys_path not in sys.path:
+    sys.path.insert(0, _sys_path)
+
 from crossmodel_query_rewrite import rewrite_cypher_to_cypher_and_sql, modify_cypher_node_labels
 from llm_multiseg_generation import check_multiseg, PROP_MAPPING
 from utils.cypher_rewrite_util import VAR_PROP_PATTERN
