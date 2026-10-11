@@ -256,6 +256,7 @@ def generate(openai_client, out_path: str, target_valid: int = 100, per_call: in
     Passing queries go to out_path, the rest (with the reason) to rejected_path.
     k: only generate (and keep) k-segment queries; None samples k from K_DIST."""
     from multiseg_query_rewrite import decompose_multiseg   # local import: that module imports this one
+    from utils.llm_correction_util import correct_query_edges   # deterministic edge-direction fix (ICDE pipeline)
     rng = random.Random(seed)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     rejected_path = rejected_path or out_path.replace(".jsonl", "") + "_rejected.jsonl"
@@ -275,6 +276,15 @@ def generate(openai_client, out_path: str, target_valid: int = 100, per_call: in
                 continue
             for q in queries:
                 if not isinstance(q, dict) or "cypher" not in q:
+                    continue
+                # same deterministic correction as llm_workload_correction.py: reversed edges are flipped,
+                # non-existing edge types / wrong node pairs are rejected (no database needed)
+                errors, fixed = correct_query_edges(q["cypher"], extended_rel_map)
+                if fixed is not None:
+                    q["cypher"], q["edge_direction_corrected"] = fixed, True
+                elif errors:
+                    rej.write(json.dumps({"spec": spec.__dict__, **q,
+                                          "reason": "edge error: " + ", ".join(sorted(e.name for e in errors))}) + "\n")
                     continue
                 q["cypher"], q["boundary_limits"] = fill_limits(q["cypher"], rng)
                 q["cypher"], q["boundary_thresholds"] = fill_thresholds(q["cypher"], rng)

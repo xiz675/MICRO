@@ -17,7 +17,11 @@ cd benchmark/ldbc-workload-generation
 # 1. generate until 100 queries pass the static checker + decomposition (needs OPENAI_API_KEY)
 python llm_multiseg_generation.py --generate --target 100 --out multiseg_llm.jsonl
 #    rejected queries and reasons: multiseg_llm_rejected.jsonl
-# 2. (optional) edge-direction correction as before: llm_workload_correction.py
+#    edge directions are corrected during generation with correct_query_edges from
+#    utils/llm_correction_util.py (same logic as llm_workload_correction.py); queries with a
+#    non-existing edge type or an edge between the wrong node labels are rejected.
+#    The EXPLAIN-cardinality check of llm_workload_correction.py is not used (aggregation
+#    boundaries make small estimates normal); the collector's precheck validates on the real data.
 # 3. deterministic decomposition
 python multiseg_query_rewrite.py multiseg_llm.jsonl out/
 # 4. precheck on the real databases (EXPLAIN every plan + one canonical execution per query)
