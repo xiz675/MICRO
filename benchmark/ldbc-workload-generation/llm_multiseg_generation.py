@@ -48,9 +48,9 @@ Country or City are Place
 Post or Comment are Message
 University or Company are Organisation
 """
-RELATIONSHIP = ("Relationship type with a list of source node label and target node label: \n" +
-                "\n".join(r + ": " + ", ".join(f"({a}, {b})" for a, b in sorted(extended_rel_map[r]))
-                          for r in extended_rel_map))
+# written as directed patterns: LLMs follow `(:Post)-[:HAS_CREATOR]->(:Person)` far better than (Post, Person)
+RELATIONSHIP = ("Relationships (use exactly these directions):\n" +
+                "\n".join(f"(:{a})-[:{r}]->(:{b})" for r in extended_rel_map for a, b in sorted(extended_rel_map[r])))
 SCHEMA_DESCRIPTION = NODE_PROPERTY + "\n" + RELATIONSHIP
 
 # properties NOT in neo4j (same as crossmodel_query_rewrite.py)
@@ -184,15 +184,31 @@ Generate {n} Cypher queries. Every query MUST follow this shape specification:
 Hard rules (a query violating any rule is discarded):
 1. Read-only. Use only MATCH, WHERE, WITH, ORDER BY, LIMIT, RETURN. No OPTIONAL MATCH, UNWIND, CALL, subqueries, EXISTS, or list comprehensions.
 2. Segments are separated by WITH. Each boundary WITH must contain an aggregation (count/avg/min/max/sum) and may be followed by WHERE on the aggregate or ORDER BY ... LIMIT. WHERE and ORDER BY after a WITH or RETURN may only refer to aliases defined in that WITH/RETURN (e.g. `ORDER BY postCount DESC`), never to `var.property`.
-3. Segment i+1 must start from a node variable carried through the preceding WITH, written without a label, e.g. `MATCH (f)-[...]->...`.
-4. Every segment must contain at least one predicate on a node property other than `id` (inline `{{prop: $p}}` or in WHERE), or the boundary must aggregate a property other than `id`.
-5. Never filter on `id`. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels, properties and relationship directions from the schema. There are no relationship properties.
+3. After a WITH, ONLY the variables listed in that WITH exist. Segment i+1 must start from a node variable listed in the preceding WITH, written without a label, e.g. after `WITH f, count(m) AS c` write `MATCH (f)-[...]->...`. Any other variable from segment i (e.g. `p`) no longer exists: writing `MATCH (p)` would create a new, unrelated variable.
+4. Segment 1 must filter on a node property other than `id` BEFORE its WITH, either inline (`(t:Tag {{name: $tag}})`) or in a WHERE (`WHERE p.birthday > $date`), or its WITH must aggregate a property other than `id` (e.g. `avg(m.length)`). Counting nodes alone (`count(p)` with no property filter) is not enough. Every later segment must also contain at least one such property predicate.
+5. Never filter on `id`. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels and properties from the schema, and every relationship must point in exactly the direction listed in the schema (e.g. `(c:Comment)-[:HAS_CREATOR]->(p:Person)`, never `(p:Person)-[:HAS_CREATOR]-(c:Comment)` or `(p)-[:HAS_CREATOR]->(c)`). There are no relationship properties.
 6. Use $placeholders for every constant, including LIMIT ($k) and thresholds ($n). Do not use equality on datetime properties. Do not use STARTS WITH, ENDS WITH, CONTAINS or regex.
 7. The queries must be semantically meaningful: each stage should narrow down or rank entities that the next stage explores. Write a one-sentence natural-language description for each.
 8. The {n} queries must differ from each other in node labels and relationship types used.
 
+Common mistakes (queries like these are discarded):
+WRONG, segment 2 starts from `p`, which was not kept by the WITH, and segment 1 has no property filter:
+  MATCH (u:University)<-[:STUDY_AT]-(p:Person)-[:WORK_AT]->(c:Company)
+  WITH u, count(p) AS alumniCount WHERE alumniCount > $n
+  MATCH (p)-[:KNOWS]-(f:Person) RETURN u.name, count(f)
+RIGHT, keep the variable you continue from and filter on a property before the WITH:
+  MATCH (u:University)<-[:STUDY_AT]-(p:Person)-[:WORK_AT]->(c:Company)
+  WHERE p.birthday > $birthday
+  WITH u, count(p) AS alumniCount WHERE alumniCount > $n
+  MATCH (u)<-[:STUDY_AT]-(s:Person)<-[:HAS_MEMBER]-(fo:Forum)
+  WHERE fo.creationDate > $date
+  RETURN u.name, count(DISTINCT fo) AS forumCount
+WRONG, relationship direction: (p:Person)-[:HAS_CREATOR]-(po:Post). RIGHT: (po:Post)-[:HAS_CREATOR]->(p:Person).
+
 Examples of the expected style (they do not follow the shape specification above):
 {examples}
+
+Before answering, check every query against rules 3, 4 and 5.
 
 Return JSON only: {{"queries": [{{"nl": "...", "cypher": "..."}}, ...]}}
 """
