@@ -28,11 +28,6 @@ import random
 import re
 from dataclasses import dataclass, field
 
-import sys as _sys
-_sys_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # benchmark/ (utils)
-if _sys_path not in _sys.path:
-    _sys.path.insert(0, _sys_path)
-
 from llm_workload_generation import extended_rel_map as _icde_extended_rel_map
 
 # Relationships used for the prompt and for edge-direction correction. The ICDE map lists the LDBC
@@ -267,7 +262,7 @@ def _signature(cypher: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"\$\w+|\b\d+\b", "?", cypher)).strip().lower()
 
 
-DEFAULT_MODEL = "gpt-5.5"
+DEFAULT_MODEL = "gpt-5.1"
 
 
 def is_reasoning_model(model: str) -> bool:
