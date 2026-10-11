@@ -28,7 +28,16 @@ import random
 import re
 from dataclasses import dataclass, field
 
-from llm_workload_generation import extended_rel_map
+from llm_workload_generation import extended_rel_map as _icde_extended_rel_map
+
+# Relationships used for the prompt and for edge-direction correction. The ICDE map lists the LDBC
+# edge (Message)-[:IS_LOCATED_IN]->(Country) only for the superclass, so a correct
+# (:Post)-[:IS_LOCATED_IN]->(:Country) was rejected as WRONG_EDGE_TYPE_FOR_SPECIFIC_NODES. Only that
+# superclass edge is expanded to its subclasses: expanding the generalised pairs of the extended map
+# (e.g. Organisation->City, which comes from University->City) would allow wrong edges such as Company->City.
+extended_rel_map = {r: set(pairs) for r, pairs in _icde_extended_rel_map.items()}
+extended_rel_map["IS_LOCATED_IN"] |= {("Post", "Country"), ("Comment", "Country"),
+                                      ("Post", "Place"), ("Comment", "Place")}
 from utils.cypher_rewrite_util import (find_all_keywords_match, CYPHER_CLAUSE,
                                        VAR_PATTERN_WITH_OPTIONAL_PROPS, VAR_PROP_PATTERN)
 
@@ -95,7 +104,9 @@ class ShapeSpec:
         lines = [f"- Number of MATCH segments: exactly {self.k}.",
                  f"- The first segment starts from a {self.anchor} node."]
         for i, b in enumerate(self.boundaries):
-            lines.append(f"- Boundary {i + 1} (between segment {i + 1} and {i + 2}): {BOUNDARY_OPS[b]}.")
+            lines.append(f"- Boundary {i + 1} (between segment {i + 1} and {i + 2}): {BOUNDARY_OPS[b]}. "
+                         f"The WITH must group by the node variable that segment {i + 2} starts from, "
+                         f"e.g. `WITH p, count(fo) AS c ... MATCH (p)-...`.")
         for i, h in enumerate(self.hops):
             vl = " Use one variable-length KNOWS*1..2 pattern here." if i == self.varlength_segment else ""
             lines.append(f"- Segment {i + 1}: about {h} relationship hop(s).{vl}")
@@ -187,7 +198,7 @@ Hard rules (a query violating any rule is discarded):
 2. Segments are separated by WITH. Each boundary WITH must contain an aggregation (count/avg/min/max/sum) and may be followed by WHERE on the aggregate or ORDER BY ... LIMIT. WHERE and ORDER BY after a WITH or RETURN may only refer to aliases defined in that WITH/RETURN (e.g. `ORDER BY postCount DESC`), never to `var.property`.
 3. After a WITH, ONLY the variables listed in that WITH exist. Segment i+1 must start from a node variable listed in the preceding WITH, written without a label, e.g. after `WITH f, count(m) AS c` write `MATCH (f)-[...]->...`. Any other variable from segment i (e.g. `p`) no longer exists: writing `MATCH (p)` would create a new, unrelated variable.
 4. Segment 1 must filter on a node property other than `id` BEFORE its WITH, either inline (`(t:Tag {{name: $tag}})`) or in a WHERE (`WHERE p.birthday > $date`), or its WITH must aggregate a property other than `id` (e.g. `avg(m.length)`). Counting nodes alone (`count(p)` with no property filter) is not enough. Every later segment must ALSO filter on a non-id property of one of its own nodes in its MATCH/WHERE (returning a property in RETURN does not count).
-5. Never filter on `id`. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels and properties from the schema, and every relationship must point in exactly the direction listed in the schema (e.g. `(c:Comment)-[:HAS_CREATOR]->(p:Person)`, never `(p:Person)-[:HAS_CREATOR]-(c:Comment)` or `(p)-[:HAS_CREATOR]->(c)`). There are no relationship properties.
+5. Never filter on `id`. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels and the properties listed for that label (e.g. Tag has only id and name, no creationDate), and every relationship must point in exactly the direction listed in the schema (e.g. `(c:Comment)-[:HAS_CREATOR]->(p:Person)`, never `(p:Person)-[:HAS_CREATOR]-(c:Comment)` or `(p)-[:HAS_CREATOR]->(c)`). There are no relationship properties.
 6. Use $placeholders for every constant, including LIMIT ($k) and thresholds ($n). Do not use equality on datetime properties. Do not use STARTS WITH, ENDS WITH, CONTAINS or regex.
 7. The queries must be semantically meaningful: each stage should narrow down or rank entities that the next stage explores. Write a one-sentence natural-language description for each.
 8. The {n} queries must differ from each other in node labels and relationship types used.
@@ -197,13 +208,13 @@ WRONG, segment 2 starts from `p`, which was not kept by the WITH, and segment 1 
   MATCH (u:University)<-[:STUDY_AT]-(p:Person)-[:WORK_AT]->(c:Company)
   WITH u, count(p) AS alumniCount WHERE alumniCount > $n
   MATCH (p)-[:KNOWS]-(f:Person) RETURN u.name, count(f)
-RIGHT, keep the variable you continue from and filter on a property before the WITH:
-  MATCH (u:University)<-[:STUDY_AT]-(p:Person)-[:WORK_AT]->(c:Company)
-  WHERE p.birthday > $birthday
-  WITH u, count(p) AS alumniCount WHERE alumniCount > $n
-  MATCH (u)<-[:STUDY_AT]-(s:Person)<-[:HAS_MEMBER]-(fo:Forum)
+RIGHT, group by the variable segment 2 continues from (here `p`) and filter on properties in both segments:
+  MATCH (u:University)<-[:STUDY_AT]-(p:Person)<-[:HAS_MEMBER]-(fo:Forum)
   WHERE fo.creationDate > $date
-  RETURN u.name, count(DISTINCT fo) AS forumCount
+  WITH p, count(fo) AS forumCount WHERE forumCount > $n
+  MATCH (p)-[:KNOWS*1..2]-(f:Person)
+  WHERE f.gender = $gender
+  RETURN f.browserUsed, count(DISTINCT p) AS activeFriends
 WRONG, relationship direction: (p:Person)-[:HAS_CREATOR]-(po:Post). RIGHT: (po:Post)-[:HAS_CREATOR]->(p:Person).
 
 Examples of the expected style (they do not follow the shape specification above):
@@ -386,11 +397,31 @@ def _pg_props(text: str, labels: dict, inline: bool = True) -> set:
     return found
 
 
+def _unknown_property(query: str, labels: dict):
+    """first `Label.prop` used in the query that the schema does not have (LLMs invent e.g. Tag.creationDate)"""
+    def known(label):
+        return label in PROP_MAPPING or re.sub(r'\d+$', '', label) in PROP_MAPPING
+    for m in VAR_PROP_PATTERN.finditer(query):
+        var, prop = m.group(1), m.group(2)
+        if var in labels and known(labels[var]) and prop != "id" and prop not in _pg_list(labels[var]):
+            return f"{labels[var]}.{prop}"
+    for m in VAR_PATTERN_WITH_OPTIONAL_PROPS.finditer(query):
+        _, label, props = m.groups()
+        for p in (props or "").split(","):
+            key = p.split(":")[0].strip()
+            if key and known(label) and key != "id" and key not in _pg_list(label):
+                return f"{label}.{key}"
+    return None
+
+
 def check_multiseg(query: str, expected_k: int = None) -> CheckResult:
     query = query.strip().rstrip(";")
     if FORBIDDEN.search(query):
         return CheckResult(False, "forbidden construct")
     labels = _var_labels(query)
+    bad = _unknown_property(query, labels)
+    if bad:
+        return CheckResult(False, f"unknown property {bad}")
     clauses = find_all_keywords_match(query, CYPHER_CLAUSE)
 
     result = CheckResult(False, labels=labels)
