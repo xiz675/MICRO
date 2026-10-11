@@ -26,7 +26,18 @@ python multiseg_collect.py ../benchmark/ldbc-workload-generation/out/multiseg_qu
     --precheck-only --nj-uri ... --pg-db t1 --pg-pw ...
 # 5. full collection on the queries that passed (the precheck runs again unless --no-precheck)
 python multiseg_collect.py res/precheck_passed.jsonl res/ --no-precheck --validate 3 --nj-uri ... --pg-db t1 ...
+# 6. export for CMLero: train/ and test/, each with seg1/ seg2/ (ICDE file format) + composite.json
+python multiseg_export.py "res*/multiseg_plans_with_runtime.jsonl" export/ \
+    --rel-stats results/sf10-t1/train/rel_stats.json --test-ratio 0.2
 ```
+
+Export format (`system/multiseg_export.py`): `seg<i>/` holds the four ICDE files
+(`cypher_raw_plans.json`, `workloads.json`, `all_plans_with_runtime.json`, `rel_stats.json`), one entry per
+query, aligned across segments, so `CMLero/load_workloads.prepare_input("export/train/seg2")` works as
+before. The previous segment's result appears as table label `"SEG"` in a plan's tuples: a seg2 plan
+containing it waits for seg1 (sequential), otherwise it runs in parallel. `composite.json` lists every
+composite plan per query (`plans: [j1, j2]` index the per-segment plan lists) with its composed latency.
+Pairs are built within a query at training time, as in CMLero.
 
 Running on several machines: give every node the same `precheck_passed.jsonl` and run shard i of n
 (`--shard 0/5` ... `--shard 4/5`); queries are balanced by their number of segment-plan executions.
