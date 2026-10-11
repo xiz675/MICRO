@@ -262,8 +262,29 @@ def _signature(cypher: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"\$\w+|\b\d+\b", "?", cypher)).strip().lower()
 
 
+DEFAULT_MODEL = "gpt-5.1"
+
+
+def is_reasoning_model(model: str) -> bool:
+    """o-series and gpt-5.x: no temperature, max_completion_tokens instead of max_tokens"""
+    return bool(re.match(r"o\d|gpt-5", model))
+
+
+def llm_call(openai_client, model: str, prompt: str, reasoning_effort: str = "medium") -> str:
+    kw = dict(model=model, response_format={"type": "json_object"},
+              messages=[{"role": "user", "content": prompt}])
+    if is_reasoning_model(model):
+        # reasoning tokens count against the limit, so it is much larger than for gpt-4o;
+        # reasoning_effort via extra_body works with older openai package versions too
+        kw.update(max_completion_tokens=32000, extra_body={"reasoning_effort": reasoning_effort})
+    else:
+        kw.update(temperature=0.8, max_tokens=4000)
+    return openai_client.chat.completions.create(**kw).choices[0].message.content
+
+
 def generate(openai_client, out_path: str, target_valid: int = 100, per_call: int = 5, max_calls: int = 300,
-             seed: int = 0, model: str = "gpt-4o", rejected_path: str = None, k: int = None):
+             seed: int = 0, model: str = DEFAULT_MODEL, rejected_path: str = None, k: int = None,
+             reasoning_effort: str = "medium"):
     """Call the LLM until `target_valid` queries pass the static checker + deterministic decomposition.
     Passing queries go to out_path, the rest (with the reason) to rejected_path.
     k: only generate (and keep) k-segment queries; None samples k from K_DIST."""
@@ -278,13 +299,15 @@ def generate(openai_client, out_path: str, target_valid: int = 100, per_call: in
             n_calls += 1
             spec = sample_shape(rng, k=k)
             try:
-                resp = openai_client.chat.completions.create(
-                    model=model, temperature=0.8, max_tokens=4000,
-                    response_format={"type": "json_object"},
-                    messages=[{"role": "user", "content": build_prompt(spec, rng, n=per_call)}])
-                queries = json.loads(resp.choices[0].message.content)["queries"]
+                content = llm_call(openai_client, model, build_prompt(spec, rng, n=per_call), reasoning_effort)
+                queries = json.loads(content or "{}")["queries"]
             except Exception as e:     # noqa: BLE001  (API error, bad JSON)
-                print(f"call {n_calls}: {e}")
+                print(f"call {n_calls}: {type(e).__name__}: {e}")
+                # wrong model name / unsupported parameter / bad key: stop instead of burning max_calls
+                if type(e).__name__ in ("NotFoundError", "BadRequestError", "AuthenticationError",
+                                        "PermissionDeniedError"):
+                    raise SystemExit(f"stopping: {model} rejected the request (see the error above); "
+                                     f"try another --model")
                 continue
             for q in queries:
                 if not isinstance(q, dict) or "cypher" not in q:
@@ -540,7 +563,10 @@ if __name__ == "__main__":
     ap.add_argument("--generate", action="store_true", help="call the LLM (needs OPENAI_API_KEY)")
     ap.add_argument("--target", type=int, default=100, help="number of statically valid queries to collect")
     ap.add_argument("--out", default="multiseg_llm.jsonl")
-    ap.add_argument("--model", default="gpt-4o")
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="OpenAI model; reasoning models (o*, gpt-5*) are called without temperature")
+    ap.add_argument("--reasoning-effort", default="medium", choices=["low", "medium", "high"],
+                    help="only for reasoning models")
     ap.add_argument("--per-call", type=int, default=5)
     ap.add_argument("--max-calls", type=int, default=300)
     ap.add_argument("--seed", type=int, default=0)
@@ -556,5 +582,6 @@ if __name__ == "__main__":
         if not os.environ.get("OPENAI_API_KEY"):
             raise SystemExit("OPENAI_API_KEY is not set: put it in <repo>/.env (see .env.example)")
         generate(OpenAI(api_key=os.environ["OPENAI_API_KEY"]), a.out, target_valid=a.target,
-                 per_call=a.per_call, max_calls=a.max_calls, seed=a.seed, model=a.model, k=a.k)
+                 per_call=a.per_call, max_calls=a.max_calls, seed=a.seed, model=a.model, k=a.k,
+                 reasoning_effort=a.reasoning_effort)
         # next: python multiseg_query_rewrite.py <out> <prefix>; then system/multiseg_collect.py --precheck-only
