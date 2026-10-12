@@ -1,0 +1,363 @@
+query_id,segment,path_hops,varlength,tables_joined,table_types,tables,movable,subplans,boundary
+0,1,4,True,2,2,Comment Tag,2,4,having
+0,2,2,False,2,2,City University,3,8,final
+1,1,4,True,2,2,Forum Tag,2,4,having
+1,2,2,False,2,2,Company Country,3,8,final
+2,1,4,True,2,2,Message Tag,2,4,having
+2,2,2,False,2,2,Forum Post,3,8,final
+3,1,4,True,2,2,Person TagClass,2,4,having
+3,2,2,False,3,3,Comment Person Post,4,16,final
+4,1,1,False,1,1,Person,1,2,having
+4,2,3,False,3,3,Post Tag TagClass,4,16,final
+5,1,1,False,1,1,University,1,2,having
+5,2,3,False,3,3,Forum Person Tag,4,16,final
+6,1,1,False,1,1,City,1,2,having
+6,2,3,False,2,2,Message Organisation,3,8,final
+7,1,1,False,1,1,Place,1,2,having
+7,2,3,False,2,2,Company Person,3,8,final
+8,1,3,True,1,1,Post,1,2,topk
+8,2,3,False,3,3,Forum Tag TagClass,4,16,final
+9,1,3,True,1,1,Post,1,2,topk
+9,2,3,False,2,2,Country Message,3,8,final
+10,1,3,True,2,2,Person Post,2,4,topk
+10,2,3,False,2,2,Comment Tag,3,8,final
+11,1,3,True,1,1,Post,1,2,topk
+11,2,3,False,2,2,Country Organisation,3,8,final
+12,1,3,True,1,1,Post,1,2,topk
+12,2,3,False,3,3,Forum Message Place,4,16,final
+13,1,5,True,2,2,Forum TagClass,2,4,having
+13,2,2,False,2,2,Country Person,3,8,final
+14,1,5,True,2,2,Message TagClass,2,4,having
+14,2,2,False,2,2,Comment Country,3,8,final
+15,1,5,True,3,2,Person TagClass TagClass,3,8,having
+15,2,2,False,2,2,City Person,3,8,final
+16,1,3,False,1,1,Post,1,2,topk
+16,2,1,False,1,1,Person,2,4,final
+17,1,3,False,2,2,Post Tag,2,4,topk
+17,2,1,False,1,1,Person,2,4,final
+18,1,3,False,1,1,Comment,1,2,topk
+18,2,1,False,1,1,University,2,4,final
+19,1,3,False,2,2,Forum Post,2,4,topk
+19,2,1,False,1,1,Person,2,4,final
+20,1,3,False,1,1,Post,1,2,topk
+20,2,1,False,1,1,University,2,4,final
+21,1,1,False,1,1,University,1,2,having
+21,2,2,False,2,2,Post Tag,3,8,final
+22,1,1,False,1,1,University,1,2,having
+22,2,2,False,2,2,Company Person,3,8,final
+23,1,1,False,1,1,Place,1,2,having
+23,2,2,False,2,2,Comment Country,3,8,final
+24,1,1,False,1,1,City,1,2,having
+24,2,2,False,2,2,Person Tag,3,8,final
+25,1,3,False,1,1,Company,1,2,topk
+25,2,3,False,3,3,Comment Person Tag,4,16,final
+26,1,3,False,2,2,Company Message,2,4,topk
+26,2,3,False,4,4,Forum Person Post Tag,5,32,final
+27,1,3,False,2,2,Company TagClass,2,4,topk
+27,2,3,False,4,4,City Forum Person Tag,5,32,final
+28,1,3,False,2,2,Company Person,2,4,topk
+28,2,3,False,4,4,City Country Person Post,5,32,final
+29,1,3,False,1,1,Company,1,2,topk
+29,2,3,False,4,4,Comment Forum Person Post,5,32,final
+30,1,3,True,2,2,Comment Person,2,4,topk
+30,2,3,False,3,3,Forum Post Tag,4,16,final
+31,1,3,True,2,2,Comment Person,2,4,topk
+31,2,3,False,2,2,Country Organisation,3,8,final
+32,1,3,True,2,2,Comment Person,2,4,topk
+32,2,3,False,3,3,Forum Tag TagClass,4,16,final
+33,1,3,True,2,2,Comment Person,2,4,topk
+33,2,3,False,2,2,Country University,3,8,final
+34,1,3,True,2,2,Comment Person,2,4,topk
+34,2,3,False,3,3,Message Place Tag,4,16,final
+35,1,3,False,2,2,Comment TagClass,2,4,having
+35,2,2,False,2,2,Company Place,3,8,final
+36,1,3,False,2,2,City Comment,2,4,having
+36,2,2,False,2,2,Forum Tag,3,8,final
+37,1,3,False,2,2,Comment TagClass,2,4,having
+37,2,2,False,2,2,Forum Person,3,8,final
+38,1,3,False,2,1,Comment Comment,2,4,having
+38,2,2,False,2,2,Message Person,3,8,final
+39,1,3,False,2,2,Comment Message,2,4,having
+39,2,2,False,2,2,Post Tag,3,8,final
+40,1,1,False,1,1,Company,1,2,having
+40,2,3,False,4,4,Country Person Post Tag,5,32,final
+41,1,1,False,1,1,Person,1,2,having
+41,2,3,False,4,4,Company Message Place Tag,5,32,final
+42,1,1,False,1,1,Company,1,2,having
+42,2,3,False,4,4,Forum Person Place Tag,5,32,final
+43,1,1,False,1,1,Company,1,2,having
+43,2,3,False,4,4,Comment Country Person University,5,32,final
+44,1,1,False,1,1,City,1,2,topk
+44,2,3,False,3,3,Person Post Tag,4,16,final
+45,1,1,False,1,1,Company,1,2,topk
+45,2,3,False,3,3,Comment Organisation Person,4,16,final
+46,1,1,False,1,1,Message,1,2,topk
+46,2,3,False,2,2,Comment Tag,3,8,final
+47,1,1,False,1,1,Organisation,1,2,topk
+47,2,3,False,3,3,Forum Organisation Person,4,16,final
+48,1,1,False,1,1,Place,1,2,topk
+48,2,3,False,3,3,Forum Message Person,4,16,final
+49,1,2,False,2,2,Country Post,2,4,having
+49,2,3,True,2,2,Comment Person,3,8,final
+50,1,2,False,2,2,Country Person,2,4,having
+50,2,3,True,2,2,Forum Person,3,8,final
+51,1,2,False,2,2,Country University,2,4,having
+51,2,3,True,3,2,City Person Person,4,16,final
+52,1,4,True,2,2,Country Person,2,4,topk
+52,2,3,False,4,4,Forum Person Post Tag,5,32,final
+53,1,4,True,2,2,Country Message,2,4,topk
+53,2,3,False,4,4,Comment Person Post Tag,5,32,final
+54,1,5,True,3,3,Country Forum Person,3,8,topk
+54,2,3,False,4,4,Forum Message Post Tag,5,32,final
+55,1,5,True,3,2,Country Person Person,3,8,topk
+55,2,3,False,4,4,Company Place Post Tag,5,32,final
+56,1,3,False,2,2,Post Tag,2,4,having
+56,2,1,False,1,1,Person,2,4,final
+57,1,3,False,2,2,Organisation Post,2,4,having
+57,2,1,False,1,1,Message,2,4,final
+58,1,3,False,2,2,Comment TagClass,2,4,having
+58,2,1,False,1,1,Person,2,4,final
+59,1,3,False,2,2,Forum University,2,4,having
+59,2,1,False,1,1,Company,2,4,final
+60,1,3,False,2,2,Post Tag,2,4,having
+60,2,1,False,1,1,Country,2,4,final
+61,1,1,False,1,1,Post,1,2,topk
+61,2,2,False,2,2,Person Post,3,8,final
+62,1,1,False,1,1,Comment,1,2,topk
+62,2,2,False,2,2,Comment Country,3,8,final
+63,1,1,False,1,1,Message,1,2,topk
+63,2,2,False,2,2,Message Post,3,8,final
+64,1,2,True,1,1,Person,1,2,having
+64,2,3,False,4,4,Forum Person Post Tag,5,32,final
+65,1,2,True,1,1,Person,1,2,having
+65,2,3,False,4,4,Message Person Place Tag,5,32,final
+66,1,2,True,1,1,Person,1,2,having
+66,2,3,False,4,4,City Country Person University,5,32,final
+67,1,2,True,1,1,Person,1,2,having
+67,2,3,False,4,4,Company Country Message Person,5,32,final
+68,1,2,True,1,1,Person,1,2,having
+68,2,3,False,4,4,Comment Person Post Tag,5,32,final
+69,1,2,False,2,2,Forum University,2,4,having
+69,2,1,False,1,1,Tag,2,4,final
+70,1,2,False,2,2,Company Person,2,4,having
+70,2,1,False,1,1,Country,2,4,final
+71,1,2,False,2,2,City Organisation,2,4,having
+71,2,1,False,1,1,Person,2,4,final
+72,1,2,False,2,2,Comment University,2,4,having
+72,2,1,False,1,1,Post,2,4,final
+73,1,2,False,2,2,Post Tag,2,4,topk
+73,2,3,False,3,3,Company Country Person,4,16,final
+74,1,2,False,2,2,Comment Tag,2,4,topk
+74,2,3,False,3,3,Country Person Post,4,16,final
+75,1,2,False,2,1,Tag Tag,2,4,topk
+75,2,3,False,3,3,City Message Person,4,16,final
+76,1,2,False,2,2,Forum Tag,2,4,topk
+76,2,3,False,3,3,City Country University,4,16,final
+77,1,2,False,2,2,Comment Tag,2,4,topk
+77,2,3,False,3,3,Organisation Person Place,4,16,final
+78,1,3,False,2,2,Post TagClass,2,4,topk
+78,2,1,False,2,2,Person Tag,3,8,final
+79,1,3,False,2,2,Country Post,2,4,topk
+79,2,1,False,2,2,Company Person,3,8,final
+80,1,3,False,2,2,Forum Tag,2,4,topk
+80,2,1,False,2,2,Forum Person,3,8,final
+81,1,3,False,2,2,Country Post,2,4,topk
+81,2,1,False,2,2,City Organisation,3,8,final
+82,1,3,False,2,2,Comment University,2,4,topk
+82,2,1,False,2,2,Person Post,3,8,final
+83,1,2,False,2,2,City Person,2,4,topk
+83,2,1,False,1,1,Person,2,4,final
+84,1,2,False,2,2,City Company,2,4,topk
+84,2,1,False,1,1,Post,2,4,final
+85,1,2,False,2,2,City Post,2,4,topk
+85,2,1,False,1,1,Comment,2,4,final
+86,1,3,False,2,2,Post Tag,2,4,topk
+86,2,3,False,2,2,City Company,3,8,final
+87,1,3,False,2,2,Message Tag,2,4,topk
+87,2,3,False,2,2,Comment Country,3,8,final
+88,1,3,False,2,2,Comment Tag,2,4,topk
+88,2,3,False,2,2,Country University,3,8,final
+89,1,3,False,2,2,Forum Tag,2,4,topk
+89,2,3,False,2,2,Comment Tag,3,8,final
+90,1,1,False,2,2,Company Person,2,4,topk
+90,2,1,False,1,1,Person,2,4,final
+91,1,1,False,2,2,Company Person,2,4,topk
+91,2,1,False,1,1,University,2,4,final
+92,1,1,False,2,2,Company Person,2,4,topk
+92,2,1,False,1,1,City,2,4,final
+93,1,1,False,1,1,Comment,1,2,having
+93,2,2,False,3,3,Forum Person Tag,4,16,final
+94,1,1,False,1,1,Comment,1,2,having
+94,2,2,False,3,3,Country Place Post,4,16,final
+95,1,1,False,1,1,Comment,1,2,having
+95,2,2,False,3,2,Tag TagClass TagClass,4,16,final
+96,1,1,False,1,1,Comment,1,2,having
+96,2,2,False,3,3,Company Person Place,4,16,final
+97,1,1,False,1,1,Comment,1,2,having
+97,2,2,False,3,3,City Person University,4,16,final
+98,1,1,False,1,1,Company,1,2,topk
+98,2,3,False,4,4,Person Place Post Tag,5,32,final
+99,1,1,False,1,1,Company,1,2,topk
+99,2,3,False,4,4,Comment Country Person Tag,5,32,final
+100,1,1,False,1,1,Person,1,2,topk
+100,2,3,False,4,4,Forum Message Person Tag,5,32,final
+101,1,1,False,1,1,Person,1,2,topk
+101,2,3,False,4,4,Company Message Person Place,5,32,final
+102,1,2,False,2,2,Forum Tag,2,4,topk
+102,2,3,False,2,2,Country University,3,8,final
+103,1,2,False,2,2,Post Tag,2,4,topk
+103,2,3,False,2,1,TagClass TagClass,3,8,final
+104,1,2,False,1,1,Person,1,2,topk
+104,2,3,False,2,2,Organisation Person,3,8,final
+105,1,2,False,1,1,Message,1,2,topk
+105,2,3,False,3,3,Comment Post Tag,4,16,final
+106,1,2,False,2,2,Forum TagClass,2,4,topk
+106,2,3,False,3,3,Message Place Tag,4,16,final
+107,1,1,False,1,1,Post,1,2,topk
+107,2,1,False,2,2,Person Tag,3,8,final
+108,1,1,False,1,1,Post,1,2,topk
+108,2,1,False,1,1,TagClass,2,4,final
+109,1,1,False,1,1,Post,1,2,topk
+109,2,1,False,2,2,Company Country,3,8,final
+110,1,1,False,1,1,Forum,1,2,topk
+110,2,1,False,2,2,Forum Person,3,8,final
+111,1,1,False,1,1,Comment,1,2,topk
+111,2,1,False,2,2,Person Post,3,8,final
+112,1,1,False,1,1,Person,1,2,topk
+112,2,2,False,3,3,Company Person University,4,16,final
+113,1,1,False,2,2,Person University,2,4,topk
+113,2,2,False,3,3,Comment Person University,4,16,final
+114,1,3,True,1,1,Comment,1,2,topk
+114,2,1,False,2,2,Person Post,3,8,final
+115,1,3,True,1,1,Comment,1,2,topk
+115,2,1,False,2,2,Forum Person,3,8,final
+116,1,4,True,1,1,Tag,1,2,topk
+116,2,1,False,2,2,Company Person,3,8,final
+117,1,4,True,1,1,Comment,1,2,topk
+117,2,1,False,2,2,Person Tag,3,8,final
+118,1,4,True,1,1,Place,1,2,topk
+118,2,1,False,2,2,City Person,3,8,final
+119,1,1,False,2,2,City University,2,4,having
+119,2,1,False,1,1,Person,2,4,final
+120,1,1,False,1,1,City,1,2,having
+120,2,1,False,2,2,Country Post,3,8,final
+121,1,1,False,2,2,City Person,2,4,having
+121,2,1,False,1,1,Forum,2,4,final
+122,1,3,False,2,2,Country Post,2,4,topk
+122,2,2,False,3,3,Person Tag TagClass,4,16,final
+123,1,3,False,3,3,City Forum Post,3,8,topk
+123,2,2,False,3,3,Forum Organisation Person,4,16,final
+124,1,3,False,2,2,Post Tag,2,4,topk
+124,2,2,False,3,3,Person Tag University,4,16,final
+125,1,3,False,3,3,Comment Place Post,3,8,topk
+125,2,2,False,3,3,Message Person Tag,4,16,final
+126,1,3,False,3,3,Country Post University,3,8,topk
+126,2,2,False,3,3,Comment Country Person,4,16,final
+127,1,3,False,1,1,Tag,1,2,topk
+127,2,1,False,2,2,Company Person,3,8,final
+128,1,3,False,1,1,Tag,1,2,topk
+128,2,1,False,1,1,Tag,2,4,final
+129,1,3,False,1,1,Tag,1,2,topk
+129,2,1,False,2,2,Message Place,3,8,final
+130,1,3,False,1,1,Tag,1,2,topk
+130,2,1,False,1,1,Person,2,4,final
+131,1,3,False,1,1,Tag,1,2,topk
+131,2,1,False,1,1,University,2,4,final
+132,1,2,False,1,1,Forum,1,2,topk
+132,2,1,False,2,1,Person Person,3,8,final
+133,1,2,False,1,1,Person,1,2,topk
+133,2,1,False,2,2,Person University,3,8,final
+134,1,2,False,1,1,Post,1,2,topk
+134,2,1,False,2,2,Comment Person,3,8,final
+135,1,2,False,1,1,Message,1,2,topk
+135,2,1,False,2,2,Person Tag,3,8,final
+136,1,2,False,2,2,Country Post,2,4,topk
+136,2,1,False,2,2,Person Tag,3,8,final
+137,1,2,False,2,2,Country Message,2,4,topk
+137,2,1,False,1,1,Person,2,4,final
+138,1,2,False,2,2,Country Message,2,4,topk
+138,2,1,False,1,1,TagClass,2,4,final
+139,1,2,False,2,2,Country University,2,4,topk
+139,2,1,False,2,2,City Person,3,8,final
+140,1,1,False,1,1,Person,1,2,having
+140,2,3,False,3,3,Person Post Tag,4,16,final
+141,1,1,False,1,1,Company,1,2,having
+141,2,3,False,3,3,Message Person Tag,4,16,final
+142,1,1,False,1,1,Place,1,2,having
+142,2,3,False,2,2,Person University,3,8,final
+143,1,1,False,1,1,Company,1,2,having
+143,2,3,False,2,2,Comment Person,3,8,final
+144,1,1,False,1,1,Tag,1,2,having
+144,2,2,False,2,2,Company Country,3,8,final
+145,1,1,False,2,2,Forum Tag,2,4,having
+145,2,2,False,2,2,Person Post,3,8,final
+146,1,1,False,2,2,Comment Tag,2,4,having
+146,2,2,False,2,2,Person Post,3,8,final
+147,1,1,False,1,1,Tag,1,2,having
+147,2,2,False,2,2,Message Tag,3,8,final
+148,1,1,False,1,1,Post,1,2,having
+148,2,2,True,2,1,Person Person,3,8,final
+149,1,1,False,1,1,Post,1,2,having
+149,2,2,True,2,1,Person Person,3,8,final
+150,1,2,False,2,2,Comment Post,2,4,having
+150,2,2,True,2,1,Person Person,3,8,final
+151,1,2,False,2,2,Post Tag,2,4,having
+151,2,2,True,2,1,Person Person,3,8,final
+152,1,1,False,1,1,Post,1,2,having
+152,2,3,False,2,2,Person TagClass,3,8,final
+153,1,1,False,1,1,Post,1,2,having
+153,2,3,False,2,2,Message Place,3,8,final
+154,1,1,False,1,1,Post,1,2,having
+154,2,3,False,2,2,Organisation Person,3,8,final
+155,1,1,False,1,1,Post,1,2,having
+155,2,3,False,2,2,City Person,3,8,final
+156,1,1,False,1,1,Comment,1,2,having
+156,2,3,False,2,2,Tag TagClass,3,8,final
+157,1,2,False,2,2,Post TagClass,2,4,topk
+157,2,2,False,2,2,Company Person,3,8,final
+158,1,2,False,2,2,Comment TagClass,2,4,topk
+158,2,2,False,2,2,Country Post,3,8,final
+159,1,2,False,2,2,Forum TagClass,2,4,topk
+159,2,2,False,2,2,Person University,3,8,final
+160,1,2,False,2,2,Message TagClass,2,4,topk
+160,2,2,False,2,2,City Person,3,8,final
+161,1,2,False,1,1,Post,1,2,having
+161,2,1,False,2,2,Person Tag,3,8,final
+162,1,2,False,1,1,TagClass,1,2,having
+162,2,1,False,2,2,Person Tag,3,8,final
+163,1,2,False,1,1,Message,1,2,having
+163,2,1,False,2,2,Comment Tag,3,8,final
+164,1,2,False,1,1,Person,1,2,having
+164,2,1,False,2,2,Comment Person,3,8,final
+165,1,1,False,1,1,TagClass,1,2,topk
+165,2,3,False,2,2,Message Person,3,8,final
+166,1,1,False,1,1,TagClass,1,2,topk
+166,2,3,False,2,2,Company Person,3,8,final
+167,1,1,False,1,1,Tag,1,2,topk
+167,2,3,False,2,2,Forum Person,3,8,final
+168,1,1,False,1,1,Tag,1,2,topk
+168,2,3,False,2,2,Country Post,3,8,final
+169,1,1,False,1,1,TagClass,1,2,topk
+169,2,3,False,2,2,Comment Post,3,8,final
+170,1,1,False,1,1,Person,1,2,topk
+170,2,3,False,3,3,Person Post Tag,4,16,final
+171,1,1,False,2,2,Person University,2,4,topk
+171,2,3,False,3,3,Forum Person Post,4,16,final
+172,1,3,False,2,2,Forum Tag,2,4,having
+172,2,2,False,2,2,Company Country,3,8,final
+173,1,3,False,2,2,City Message,2,4,having
+173,2,2,False,2,2,Tag TagClass,3,8,final
+174,1,3,False,2,2,Comment Forum,2,4,having
+174,2,2,False,2,2,Place University,3,8,final
+175,1,3,False,2,2,Country Forum,2,4,having
+175,2,2,False,2,2,Message Person,3,8,final
+176,1,3,False,2,2,Comment Post,2,4,having
+176,2,2,False,2,2,Post Tag,3,8,final
+177,1,3,False,2,2,Post Tag,2,4,topk
+177,2,3,False,2,2,Country Person,3,8,final
+178,1,3,False,1,1,Post,1,2,topk
+178,2,3,False,2,2,Person Place,3,8,final
+179,1,3,False,2,2,Company Post,2,4,topk
+179,2,3,False,2,2,Comment Person,3,8,final
+180,1,3,False,2,2,Comment Post,2,4,topk
+180,2,3,False,2,2,Message Person,3,8,final

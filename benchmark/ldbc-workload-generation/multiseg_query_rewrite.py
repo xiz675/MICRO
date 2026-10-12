@@ -139,7 +139,7 @@ def decompose_multiseg(query: str, modify_labels: bool = True, expected_k: int =
     stages, carried_in = [], []
     for i, seg in enumerate(chk.segments):
         idx = i + 1
-        last = idx == k
+        last = idx == k 
         match_text = _inject_labels(seg.match_text, carried_in, labels)
         ret_items = chk.return_items if last else seg.with_items
         post_where = "" if last else seg.post_where
