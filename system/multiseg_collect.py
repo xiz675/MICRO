@@ -68,7 +68,8 @@ from multiseg_query_rewrite import Stage, _finish_sql  # noqa: E402
 
 LARGE_QUERY_TIME = 10000          # same constants as utils/run_plan_util.py
 OUT_OF_TIME_QUERY_TIME = 100000
-MAX_RECORDS = 10000000
+MAX_RECORDS = 10000000           # graph results above this are "too_large" (--max-records)
+COUNT_TIMEOUT_MS = 240000        # timebox of the graph count check; beyond it the plan is a timeout (--graph-timeout)
 
 JOIN_RE = re.compile(r"^\s*neo4j\.(\w+)\s*=\s*(\w+)\.(\w+)\s*$")
 VAR_LABEL_RE = re.compile(r"\((\w+)\s*:\s*(\w+)")
@@ -460,7 +461,7 @@ class SegmentExecutor:
             try:
                 count_q = re.sub(r"(?is)\breturn\b.*$", "return count(*)", cypher)
                 size = self.nj.run_query_return_single_value(
-                    f"CALL apoc.cypher.runTimeboxed(\"{count_q}\", {{}}, 240000)")
+                    f"CALL apoc.cypher.runTimeboxed(\"{count_q}\", {{}}, {COUNT_TIMEOUT_MS})")
                 if size is None:
                     return OUT_OF_TIME_QUERY_TIME, 0, "timeout"
                 if size > MAX_RECORDS:
@@ -831,6 +832,7 @@ def show_query(qi: int, mq: dict, keep_params: bool, all_plans: bool):
 
 
 def main():
+    global COUNT_TIMEOUT_MS, MAX_RECORDS
     from utils.env_util import load_env
     load_env()                                        # NEO4J_PASSWORD / PG_PASSWORD from <repo>/.env
     ap = argparse.ArgumentParser()
@@ -856,6 +858,11 @@ def main():
     ap.add_argument("--shard", default=None,
                     help="i/n: run only shard i (0-based) of n, for splitting a workload across machines; queries "
                          "are balanced by their number of segment-plan executions")
+    ap.add_argument("--graph-timeout", type=float, default=COUNT_TIMEOUT_MS / 1000,
+                    help="seconds a graph query may run (count check) before the plan counts as a timeout; "
+                         "also raise Neo4j's own db.transaction.timeout to at least this")
+    ap.add_argument("--max-records", type=int, default=MAX_RECORDS,
+                    help="graph results with more rows are 'too_large' (not streamed to PostgreSQL)")
     ap.add_argument("--require-nonempty-result", action="store_true",
                     help="precheck: also drop queries whose final result is empty (allowed by default)")
     ap.add_argument("--max-precheck-seconds", type=float, default=None,
@@ -870,6 +877,7 @@ def main():
     ap.add_argument("--pg-pw", default=os.environ.get("PG_PASSWORD", "postgres"))
     ap.add_argument("--log-file", default="multiseg_collect.log")
     args = ap.parse_args()
+    COUNT_TIMEOUT_MS, MAX_RECORDS = int(args.graph_timeout * 1000), args.max_records
     if args.show:
         queries = [json.loads(l) for l in open(args.queries)]
         for qi in (args.query if args.query is not None else range(len(queries))):
