@@ -57,7 +57,9 @@ def reformulate_sql(sql_select_components: list[RelationComponent], sql_predicat
         where_clause = where_clause + " and ".join(join_predicates) + "\n"
     group_by_clause = ""
     if len(group_by_components) > 0:
-        group_by_clause = "group by " + ", ".join([i.to_sql(var_to_table) for i in group_by_components])
+        # a RETURN item `f.gender AS gender` is also a group-by key; SQL does not allow the alias there
+        group_by_clause = "group by " + ", ".join([re.sub(r"(?i)\s+as\s+\w+\s*$", "", i.to_sql(var_to_table))
+                                                   for i in group_by_components])
     return select_clause + from_clause + where_clause + group_by_clause
 
 
