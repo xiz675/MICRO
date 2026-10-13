@@ -703,7 +703,8 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
         last = i == k - 1
         p0 = rw.rewrite([])
         tm = seg_ex.run_plan(p0, stages[i].output, last, ra_table=f"r{i + 1}a")
-        seg = {"segment": i + 1, "graph_rows": tm.get("graph_rows"), "status": tm["status"]}
+        seg = {"segment": i + 1, "graph_rows": tm.get("graph_rows"), "status": tm["status"],
+               "cypher": p0.cypher, "sql": p0.sql, "rib_sql": rw.rib_sql(f"r{i + 1}a") if p0.split else None}
         rep["seconds"] += sum(tm.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql"))
         if tm["status"] != "ok":
             rep["segments"].append(seg)
@@ -802,6 +803,26 @@ def _median_timings(runs: list) -> dict:
     return out
 
 
+def show_query(qi: int, mq: dict, keep_params: bool, all_plans: bool):
+    """print the statements that are executed (no database): canonical plan per segment, or every plan"""
+    _, rws = build_rewriters(mq, keep_params)
+    print(f"################ query {qi} ################")
+    print(mq.get("original", "").strip())
+    for i, rw in enumerate(rws):
+        plans = rw.plans() if all_plans else [rw.rewrite([])]
+        for p in plans:
+            print(f"\n=== segment {i + 1}, moved {p.moved or '[] (canonical)'}"
+                  f"{', seg moved (sequential)' if p.seg_moved else ''} ===")
+            print("-- Cypher (Neo4j, result -> table neo4j):")
+            print(p.cypher)
+            print(f"-- SQL ({'R_ia, plan-specific part' if p.split else 'PostgreSQL'}):")
+            print(p.sql)
+            if p.split:
+                print(f"-- R_ib (shared by all plans of this segment, reads r{i + 1}a):")
+                print(rw.rib_sql(f"r{i + 1}a"))
+    print()
+
+
 def main():
     from utils.env_util import load_env
     load_env()                                        # NEO4J_PASSWORD / PG_PASSWORD from <repo>/.env
@@ -809,6 +830,10 @@ def main():
     ap.add_argument("queries", help="multiseg_queries.jsonl from multiseg_query_rewrite.py")
     ap.add_argument("result_dir")
     ap.add_argument("--dry-run", action="store_true", help="enumerate and print plans, no database")
+    ap.add_argument("--show", choices=["canonical", "all"], default=None,
+                    help="print the executed Cypher/SQL ($param filters dropped unless --keep-params) and exit; "
+                         "no database. Use with --query to pick queries")
+    ap.add_argument("--query", type=int, nargs="*", default=None, help="only these query indices (0-based)")
     ap.add_argument("--keep-params", action="store_true", help="execute $param predicates (instantiated queries)")
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--validate", type=int, default=0, help="composite plans per query to run end-to-end")
@@ -836,6 +861,11 @@ def main():
     ap.add_argument("--pg-pw", default=os.environ.get("PG_PASSWORD", "postgres"))
     ap.add_argument("--log-file", default="multiseg_collect.log")
     args = ap.parse_args()
+    if args.show:
+        queries = [json.loads(l) for l in open(args.queries)]
+        for qi in (args.query if args.query is not None else range(len(queries))):
+            show_query(qi, queries[qi], args.keep_params, args.show == "all")
+        return
     logging.basicConfig(filename=args.log_file, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     os.makedirs(args.result_dir, exist_ok=True)
 
@@ -859,7 +889,7 @@ def main():
                 seg_ex.mover.drop_persistent()
 
     queries = [json.loads(l) for l in open(args.queries)]
-    ids = list(range(len(queries)))
+    ids = list(range(len(queries))) if args.query is None else list(args.query)
     if args.shard:
         i, n = (int(x) for x in args.shard.split("/"))
         # greedy balance: most expensive queries first, each to the currently lightest shard
