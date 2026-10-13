@@ -680,13 +680,17 @@ def build_rewriters(mq: dict, keep_params: bool):
     return stages, [SegmentRewriter(ps, i == k - 1, keep_params) for i, ps in enumerate(parsed)]
 
 
-def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_seconds: float = None) -> dict:
+def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_seconds: float = None,
+                   allow_empty_result: bool = True) -> dict:
     """Cheap validity check before the full collection (one execution per segment).
 
     1. EXPLAIN every candidate plan's Cypher (nothing is executed). A failure on the canonical plan means
        the query is wrong; a failure on another plan means a rewrite bug.
     2. Execute the canonical plan (nothing moved) segment by segment, plus R_ib.
-       Fails on: error, timeout, empty graph result, empty seg{i} or final result, too slow.
+       Fails on: error, timeout, empty graph result, empty seg{i}, too slow, and an empty final result
+       unless allow_empty_result (the default: the plans still do all the work, only the last SQL step
+       finds nothing). An empty seg{i} is never allowed: a plan that moves it would do almost no work in
+       the next segment, so the sequential-vs-parallel choice would be trivial.
     """
     stages, rws = build_rewriters(mq, keep_params)
     rep = {"ok": False, "reason": "", "kind": "", "segments": [], "seconds": 0.0}
@@ -722,8 +726,11 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
         seg["output_rows"] = rows
         rep["segments"].append(seg)
         if rows == 0:
-            rep.update(reason=f"segment {i + 1}: empty {'result' if last else stages[i].output}", kind="query")
-            return rep
+            if last and allow_empty_result:
+                rep["empty_result"] = True
+            else:
+                rep.update(reason=f"segment {i + 1}: empty {'result' if last else stages[i].output}", kind="query")
+                return rep
     if max_seconds and rep["seconds"] > max_seconds:
         rep.update(reason=f"canonical plan too slow ({rep['seconds']:.1f}s)", kind="query")
         return rep
@@ -849,6 +856,8 @@ def main():
     ap.add_argument("--shard", default=None,
                     help="i/n: run only shard i (0-based) of n, for splitting a workload across machines; queries "
                          "are balanced by their number of segment-plan executions")
+    ap.add_argument("--require-nonempty-result", action="store_true",
+                    help="precheck: also drop queries whose final result is empty (allowed by default)")
     ap.add_argument("--max-precheck-seconds", type=float, default=None,
                     help="drop queries whose canonical plan takes longer than this")
     ap.add_argument("--nj-uri", default="localhost")
@@ -929,7 +938,8 @@ def main():
                 summary["skipped_params"] += 1
                 continue
             if not args.dry_run and not args.no_precheck:
-                rep = precheck_query(mq, seg_ex, args.keep_params, args.max_precheck_seconds)
+                rep = precheck_query(mq, seg_ex, args.keep_params, args.max_precheck_seconds,
+                                     allow_empty_result=not args.require_nonempty_result)
                 rep["query_id"] = qi
                 pre.write(json.dumps(rep) + "\n")
                 pre.flush()
