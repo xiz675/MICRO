@@ -345,8 +345,11 @@ def test_driver(make_executor) -> int:
 
     # 2b) canonical graph result too large -> fallback plan with every table moved is checked instead
     saved = mc.MAX_RECORDS
-    mq0 = mq_of(FEW_SHOT[1])
-    st0 = mc.precheck_query(mq0, ex, False)["segments"][0]
+    # pick a query whose seg1 graph result is the largest one, so only seg1 exceeds the lowered limit
+    cands = [(mq_of(q), mc.precheck_query(mq_of(q), ex, False)["segments"]) for q in FEW_SHOT]
+    mq0, segs0 = max(cands, key=lambda c: c[1][0]["graph_rows"] - max(s["graph_rows"] for s in c[1][1:]))
+    st0 = segs0[0]
+    print(f"    (graph rows per segment: {[s['graph_rows'] for s in segs0]})")
     mc.MAX_RECORDS = st0["graph_rows"] - 1           # canonical seg1 just above the limit
     rep = mc.precheck_query(mq0, ex, False)
     fb = rep["segments"][0].get("fallback")
@@ -354,6 +357,9 @@ def test_driver(make_executor) -> int:
            f"graph rows {rep['segments'][0]['graph_rows']} vs canonical {st0['graph_rows']})",
            fb is not None and fb["canonical_status"] == "too_large" and
            (rep["ok"] or "also with every table moved" in rep["reason"]))
+    if all(s["graph_rows"] <= mc.MAX_RECORDS for s in segs0[1:]):
+        expect(f"fallback time excludes the LARGE_QUERY_TIME placeholder ({rep['seconds']:.1f}s)",
+               rep["ok"] and rep["seconds"] < mc.LARGE_QUERY_TIME)
     rep_nf = mc.precheck_query(mq0, ex, False, fallback=False)
     expect("without fallback the query is dropped as too_large", not rep_nf["ok"] and "too_large" in rep_nf["reason"])
     mc.MAX_RECORDS = saved

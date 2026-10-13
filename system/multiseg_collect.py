@@ -761,7 +761,8 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
         tm = seg_ex.run_plan(p, stages[i].output, last, ra_table=f"r{i + 1}a")
         seg = {"segment": i + 1, "graph_rows": tm.get("graph_rows"), "status": tm["status"],
                "cypher": p.cypher, "sql": p.sql, "rib_sql": rw.rib_sql(f"r{i + 1}a") if p.split else None}
-        rep["seconds"] += sum(tm.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql"))
+        canon_seconds = sum(tm.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql"))
+        rep["seconds"] += canon_seconds
         if fallback and tm["status"] in ("too_large", "timeout"):
             full = rw.plans()[-1]                      # every movable relation moved into Neo4j
             if full.moved:
@@ -769,7 +770,9 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
                 seg.update(fallback={"canonical_status": tm["status"], "moved": full.moved},
                            graph_rows=tm2.get("graph_rows"), status=tm2["status"],
                            cypher=full.cypher, sql=full.sql, rib_sql=None)
-                rep["seconds"] += sum(tm2.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql"))
+                # the canonical plan's time is the LARGE_QUERY_TIME / OUT_OF_TIME placeholder, not a measurement:
+                # only the fallback plan counts towards --max-precheck-seconds
+                rep["seconds"] += sum(tm2.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql")) - canon_seconds
                 p, tm = full, tm2
         if tm["status"] != "ok":
             rep["segments"].append(seg)
@@ -803,7 +806,7 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
             rep.update(reason=f"segment {i + 1}: empty {'result' if last else stages[i].output}", kind="query")
             return rep
     if max_seconds and rep["seconds"] > max_seconds:
-        rep.update(reason=f"canonical plan too slow ({rep['seconds']:.1f}s)", kind="query")
+        rep.update(reason=f"checked plan too slow ({rep['seconds']:.1f}s)", kind="query")
         return rep
     rep["ok"] = True
     return rep
