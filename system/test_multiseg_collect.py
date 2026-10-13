@@ -329,9 +329,34 @@ def test_driver(make_executor) -> int:
     rep = mc.precheck_query(mq, ex, keep_params=False)
     expect(f"invalid relationship type is caught ({rep['reason'][:50]}...)", not rep["ok"] and rep["kind"] == "query")
 
-    # 2) empty seg1: HAVING threshold no group can reach -> precheck fails
-    rep = mc.precheck_query(mq_of(FEW_SHOT[1].replace("localMembers > $n", "localMembers > 100000")), ex, False)
+    # 2) empty seg1: HAVING threshold no group can reach -> precheck fails without calibration ...
+    mq_hi = mq_of(FEW_SHOT[1].replace("localMembers > $n", "localMembers > 100000"))
+    rep = mc.precheck_query(mq_hi, ex, False, calibrate=False)
     expect(f"empty intermediate result is caught ({rep['reason']})", not rep["ok"] and "empty" in rep["reason"])
+    # ... and with calibration the threshold is re-chosen from the data and the query passes
+    rep = mc.precheck_query(mq_hi, ex, False)
+    cal = rep.get("calibrated") or {}
+    q2 = rep["query"]
+    expect(f"threshold calibrated {cal.get('old')} -> {cal.get('new')}, query passes, all text fields updated",
+           rep["ok"] and cal.get("old") == 100000 and cal.get("new", 10 ** 9) < 100000
+           and "100000" not in q2["stages"][0]["sql"] + q2["stages"][0]["post_where"] + q2["original"]
+           and q2["calibrated_thresholds"][0]["new"] == cal["new"]
+           and mc.collect_query(q2, ex, keep_params=False, repeat=1, dry_run=False)[0]["usable_for_training"])
+
+    # 2b) canonical graph result too large -> fallback plan with every table moved is checked instead
+    saved = mc.MAX_RECORDS
+    mq0 = mq_of(FEW_SHOT[1])
+    st0 = mc.precheck_query(mq0, ex, False)["segments"][0]
+    mc.MAX_RECORDS = st0["graph_rows"] - 1           # canonical seg1 just above the limit
+    rep = mc.precheck_query(mq0, ex, False)
+    fb = rep["segments"][0].get("fallback")
+    expect(f"too-large canonical plan falls back to moving every table ({fb}, ok={rep['ok']}, "
+           f"graph rows {rep['segments'][0]['graph_rows']} vs canonical {st0['graph_rows']})",
+           fb is not None and fb["canonical_status"] == "too_large" and
+           (rep["ok"] or "also with every table moved" in rep["reason"]))
+    rep_nf = mc.precheck_query(mq0, ex, False, fallback=False)
+    expect("without fallback the query is dropped as too_large", not rep_nf["ok"] and "too_large" in rep_nf["reason"])
+    mc.MAX_RECORDS = saved
 
     # 3) rewrite bug in one plan (drops a join when Tag0 is moved) -> consistency check flags the query
     orig = mc.SegmentRewriter.rewrite

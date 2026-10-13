@@ -681,20 +681,71 @@ def build_rewriters(mq: dict, keep_params: bool):
     return stages, [SegmentRewriter(ps, i == k - 1, keep_params) for i, ps in enumerate(parsed)]
 
 
+_BOUNDARY_RE = re.compile(r"(?is)^\s*select \* from \((.*)\)\s*b1\s*where\s+(\w+)\s*(>=|>)\s*(\d+)\s*$")
+
+
+def calibrate_boundary(pg, plan_sql: str):
+    """HAVING-style boundary `where c > N` that removes every group: choose N from the aggregate's
+    distribution on the real data (graph result in table neo4j). Keeps roughly the top quarter of the
+    groups (75th percentile), falling back to the median and then to max-1, so that seg{i} is not empty.
+    Returns (alias, op, old, new) or None (no count threshold, or the join itself is empty)."""
+    m = _BOUNDARY_RE.match(plan_sql)
+    if not m:
+        return None
+    core, alias, op, old = m.group(1), m.group(2), m.group(3), int(m.group(4))
+    r = pg.run_query_return_result(
+        f"select count(*), percentile_disc(0.75) within group (order by {alias}), "
+        f"percentile_disc(0.5) within group (order by {alias}), max({alias}) from ({core}) g")
+    if not r or not r[0][0]:
+        return None
+    _, q75, q50, mx = r[0]
+    cands = [q75, q50, mx - 1] if op == ">" else [q75, q50, mx]
+    for t in cands:
+        t = int(t)
+        if t == old:
+            continue
+        n = pg.run_query_return_result(f"select count(*) from ({core}) g where {alias} {op} {t}")
+        if n and n[0][0] > 0:
+            return alias, op, old, t
+    return None
+
+
+def apply_threshold(mq: dict, stage_idx: int, alias: str, op: str, old: int, new: int) -> dict:
+    """copy of mq with the boundary threshold of stage stage_idx (0-based) replaced, in every text field"""
+    mq = json.loads(json.dumps(mq))
+    pat = re.compile(rf"\b{re.escape(alias)}\s*{re.escape(op)}\s*{old}\b")
+    st = mq["stages"][stage_idx]
+    for f in ("sql", "post_where", "core_sql"):
+        if isinstance(st.get(f), str):
+            st[f] = pat.sub(f"{alias} {op} {new}", st[f])
+    for f in ("original", "combined_sql", "full_sql"):
+        if isinstance(mq.get(f), str):
+            mq[f] = pat.sub(f"{alias} {op} {new}", mq[f], count=1)
+    mq.setdefault("calibrated_thresholds", []).append({"segment": stage_idx + 1, "alias": alias, "op": op,
+                                                       "old": old, "new": new})
+    return mq
+
+
 def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_seconds: float = None,
-                   allow_empty_result: bool = True) -> dict:
+                   allow_empty_result: bool = True, calibrate: bool = True, fallback: bool = True) -> dict:
     """Cheap validity check before the full collection (one execution per segment).
 
     1. EXPLAIN every candidate plan's Cypher (nothing is executed). A failure on the canonical plan means
        the query is wrong; a failure on another plan means a rewrite bug.
-    2. Execute the canonical plan (nothing moved) segment by segment, plus R_ib.
-       Fails on: error, timeout, empty graph result, empty seg{i}, too slow, and an empty final result
-       unless allow_empty_result (the default: the plans still do all the work, only the last SQL step
-       finds nothing). An empty seg{i} is never allowed: a plan that moves it would do almost no work in
-       the next segment, so the sequential-vs-parallel choice would be trivial.
+    2. Execute the canonical plan (nothing moved) segment by segment, plus R_ib. If its graph result is
+       too large or times out, execute the plan that moves every relation instead (fallback): moving the
+       pre-filtered tables shrinks the graph result, so such a query is still usable; its too-large plans
+       get LARGE_QUERY_TIME in the training data, as in the ICDE version.
+       Fails on: error, timeout/too large also with the fallback, empty graph result, empty seg{i}, too slow,
+       and an empty final result unless allow_empty_result (the default: the plans still do all the work,
+       only the last SQL step finds nothing). An empty seg{i} is never allowed: a plan that moves it would
+       do almost no work in the next segment, so the sequential-vs-parallel choice would be trivial.
+    3. calibrate: when a HAVING-style count threshold empties seg{i}, the threshold is re-chosen from the
+       aggregate's distribution (calibrate_boundary) and the query is checked again; the returned report
+       carries the modified query in rep["query"] (write that one to precheck_passed.jsonl).
     """
     stages, rws = build_rewriters(mq, keep_params)
-    rep = {"ok": False, "reason": "", "kind": "", "segments": [], "seconds": 0.0}
+    rep = {"ok": False, "reason": "", "kind": "", "segments": [], "seconds": 0.0, "query": mq}
     for i, rw in enumerate(rws):
         for j, p in enumerate(rw.plans()):
             try:
@@ -706,17 +757,27 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
     k = len(stages)
     for i, rw in enumerate(rws):
         last = i == k - 1
-        p0 = rw.rewrite([])
-        tm = seg_ex.run_plan(p0, stages[i].output, last, ra_table=f"r{i + 1}a")
+        p = rw.rewrite([])
+        tm = seg_ex.run_plan(p, stages[i].output, last, ra_table=f"r{i + 1}a")
         seg = {"segment": i + 1, "graph_rows": tm.get("graph_rows"), "status": tm["status"],
-               "cypher": p0.cypher, "sql": p0.sql, "rib_sql": rw.rib_sql(f"r{i + 1}a") if p0.split else None}
+               "cypher": p.cypher, "sql": p.sql, "rib_sql": rw.rib_sql(f"r{i + 1}a") if p.split else None}
         rep["seconds"] += sum(tm.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql"))
+        if fallback and tm["status"] in ("too_large", "timeout"):
+            full = rw.plans()[-1]                      # every movable relation moved into Neo4j
+            if full.moved:
+                tm2 = seg_ex.run_plan(full, stages[i].output, last, ra_table=f"r{i + 1}a")
+                seg.update(fallback={"canonical_status": tm["status"], "moved": full.moved},
+                           graph_rows=tm2.get("graph_rows"), status=tm2["status"],
+                           cypher=full.cypher, sql=full.sql, rib_sql=None)
+                rep["seconds"] += sum(tm2.get(x, 0) for x in ("pre_base", "move_seg", "graph", "sql"))
+                p, tm = full, tm2
         if tm["status"] != "ok":
             rep["segments"].append(seg)
-            rep.update(reason=f"segment {i + 1}: {tm['status']} {tm.get('error', '')}".strip(), kind="query")
+            st = tm["status"] + (" (also with every table moved)" if "fallback" in seg else "")
+            rep.update(reason=f"segment {i + 1}: {st} {tm.get('error', '')}".strip(), kind="query")
             return rep
         rows = tm["sql_rows"]
-        if p0.split:
+        if p.split:
             rb = seg_ex.run_rib(rw.rib_sql(f"r{i + 1}a"), stages[i].output, last)
             rep["seconds"] += rb["rib"]
             if rb["status"] != "ok":
@@ -729,9 +790,18 @@ def precheck_query(mq: dict, seg_ex: SegmentExecutor, keep_params: bool, max_sec
         if rows == 0:
             if last and allow_empty_result:
                 rep["empty_result"] = True
-            else:
-                rep.update(reason=f"segment {i + 1}: empty {'result' if last else stages[i].output}", kind="query")
-                return rep
+                continue
+            if not last and calibrate and not p.split:
+                cal = calibrate_boundary(seg_ex.pg, p.sql)
+                if cal:
+                    alias, op, old, new = cal
+                    new_mq = apply_threshold(mq, i, alias, op, old, new)
+                    rep2 = precheck_query(new_mq, seg_ex, keep_params, max_seconds, allow_empty_result,
+                                          calibrate=False, fallback=fallback)
+                    rep2["calibrated"] = {"segment": i + 1, "alias": alias, "op": op, "old": old, "new": new}
+                    return rep2
+            rep.update(reason=f"segment {i + 1}: empty {'result' if last else stages[i].output}", kind="query")
+            return rep
     if max_seconds and rep["seconds"] > max_seconds:
         rep.update(reason=f"canonical plan too slow ({rep['seconds']:.1f}s)", kind="query")
         return rep
@@ -863,6 +933,11 @@ def main():
                          "also raise Neo4j's own db.transaction.timeout to at least this")
     ap.add_argument("--max-records", type=int, default=MAX_RECORDS,
                     help="graph results with more rows are 'too_large' (not streamed to PostgreSQL)")
+    ap.add_argument("--no-calibrate", action="store_true",
+                    help="precheck: do not re-choose a HAVING threshold that empties seg{i}")
+    ap.add_argument("--no-fallback", action="store_true",
+                    help="precheck: drop a query whose canonical graph result is too large / times out, instead "
+                         "of checking it with every table moved")
     ap.add_argument("--require-nonempty-result", action="store_true",
                     help="precheck: also drop queries whose final result is empty (allowed by default)")
     ap.add_argument("--max-precheck-seconds", type=float, default=None,
@@ -947,8 +1022,14 @@ def main():
                 continue
             if not args.dry_run and not args.no_precheck:
                 rep = precheck_query(mq, seg_ex, args.keep_params, args.max_precheck_seconds,
-                                     allow_empty_result=not args.require_nonempty_result)
+                                     allow_empty_result=not args.require_nonempty_result,
+                                     calibrate=not args.no_calibrate, fallback=not args.no_fallback)
+                mq = rep.pop("query")                   # threshold possibly re-calibrated
                 rep["query_id"] = qi
+                if rep.get("calibrated"):
+                    c = rep["calibrated"]
+                    print(f"[precheck] query {qi}: segment {c['segment']} threshold "
+                          f"{c['alias']} {c['op']} {c['old']} -> {c['new']} (seg was empty)")
                 pre.write(json.dumps(rep) + "\n")
                 pre.flush()
                 if not rep["ok"]:
