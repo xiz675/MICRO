@@ -98,11 +98,11 @@ def build_data(pg: PostgresUtil, seed=0):
         table(f"filter_{lab}", [("id", "bigint")], [(i,) for i in ids[kind] if rng.random() < 0.8])
     # pre-filtered property tables (T1-style): ~70% of the entities survive the "predicates"
     props = {
-        "Person": [("firstname", "text"), ("gender", "text"), ("birthday", "text"), ("browserused", "text")],
+        "Person": [("firstname", "text"), ("gender", "text"), ("creationdate", "text"), ("lastname", "text")],
         "Post": [("creationdate", "text"), ("length", "int")],
         "Comment": [("creationdate", "text"), ("length", "int")],
         "Tag": [("name", "text")], "TagClass": [("name", "text")], "Country": [("name", "text")],
-        "City": [("name", "text")], "Forum": [("title", "text")], "Company": [("name", "text")],
+        "City": [("name", "text")], "Forum": [("title", "text"), ("creationdate", "text")], "Company": [("name", "text")],
         "University": [("name", "text")],
     }
     for kind, cols in props.items():

@@ -49,15 +49,20 @@ from utils.cypher_rewrite_util import (find_all_keywords_match, CYPHER_CLAUSE,
 # ---------------------------------------------------------------------------
 # Schema (identical to the single-segment generator)
 # ---------------------------------------------------------------------------
+# Properties that exist in the CM-LDBC property tables (r_<label> in PostgreSQL); the full LDBC schema has
+# more (birthday, browserUsed, locationIP, email, speaks), but those columns were not loaded, so queries using
+# them fail in SQL. Keep this, PROP_MAPPING and the tables in sync (check with information_schema.columns).
 NODE_PROPERTY = """
 Node properties:
-Country, City, Place: id, name
-Organisation, University, Company: id, name
+Country, City: id, name
+Place: id, name, type
+Organisation: id, name, type
+University, Company: id, name
 TagClass: id, name
 Tag: id, name
-Forum: creationDate, id, title
-Person: creationDate, id, firstName, lastName, gender, birthday, speaks, locationIP, browserUsed, email
-Post, Comment, Message: creationDate, id, locationIP, browserUsed, content, length
+Forum: id, creationDate, title
+Person: id, creationDate, firstName, lastName, gender
+Post, Comment, Message: id, creationDate, content, length
 Country or City are Place
 Post or Comment are Message
 University or Company are Organisation
@@ -69,14 +74,14 @@ SCHEMA_DESCRIPTION = NODE_PROPERTY + "\n" + RELATIONSHIP
 
 # properties NOT in neo4j (same as crossmodel_query_rewrite.py)
 PROP_MAPPING = {
-    "City": ["name"], "Place": ["name"], "Country": ["name"], "Continent": ["name"],
-    "Organisation": ["name"], "University": ["name"], "Company": ["name"],
+    "City": ["name"], "Place": ["name", "type"], "Country": ["name"], "Continent": ["name"],
+    "Organisation": ["name", "type"], "University": ["name"], "Company": ["name"],
     "TagClass": ["name"], "Tag": ["name"],
     "Forum": ["title", "creationDate"],
-    "Person": ["email", "firstName", "lastName", "gender", "birthday", "speaks", "locationIP", "browserUsed"],
-    "Post": ["creationDate", "content", "length", "locationIP", "browserUsed"],
-    "Comment": ["creationDate", "content", "length", "locationIP", "browserUsed"],
-    "Message": ["creationDate", "content", "length", "locationIP", "browserUsed"],
+    "Person": ["creationDate", "firstName", "lastName", "gender"],
+    "Post": ["creationDate", "content", "length"],
+    "Comment": ["creationDate", "content", "length"],
+    "Message": ["creationDate", "content", "length"],
 }
 
 # ---------------------------------------------------------------------------
@@ -85,8 +90,8 @@ PROP_MAPPING = {
 BOUNDARY_OPS = {
     "topk": "keep the top-$k groups: `WITH x, count(...) AS c ORDER BY c DESC LIMIT $k`",
     "having": "keep groups passing a threshold: `WITH x, count(...) AS c WHERE c > $n`",
-    "attr_agg": ("aggregate a node property (avg/min/max over a non-id property such as length, "
-                 "birthday, creationDate), then `ORDER BY` that aggregate and `LIMIT $k` (no threshold)"),
+    "attr_agg": ("aggregate a node property (avg/min/max over a non-id property such as length "
+                 "or creationDate), then `ORDER BY` that aggregate and `LIMIT $k` (no threshold)"),
 }
 ANCHOR_LABELS = ["Person", "Forum", "Tag", "TagClass", "Country", "City", "University", "Company", "Post", "Comment"]
 FINAL_OPS = {
@@ -184,7 +189,7 @@ def fill_limits(cypher: str, rng: random.Random) -> tuple[str, list]:
 FEW_SHOT = [
     # k=2, top-k boundary
     """MATCH (p:Person {firstName: $firstName})-[:KNOWS*1..2]-(f:Person)<-[:HAS_CREATOR]-(m:Post)
-WHERE f.birthday > $birthday AND m.creationDate > $date
+WHERE f.creationDate > $since AND m.creationDate > $date
 WITH f, count(m) AS postCount ORDER BY postCount DESC LIMIT $k
 MATCH (f)<-[:HAS_CREATOR]-(:Post)<-[:REPLY_OF]-(c:Comment)-[:HAS_TAG]->(t:Tag)
 WHERE c.length > $length
@@ -204,7 +209,7 @@ MATCH (t)<-[:HAS_INTEREST]-(p:Person)-[:WORK_AT]->(o:Company)-[:IS_LOCATED_IN]->
 WHERE co.name = $country
 WITH p, count(DISTINCT t) AS sharedTags WHERE sharedTags >= $n
 MATCH (p)-[:KNOWS]-(q:Person)
-WHERE q.browserUsed = $browser
+WHERE q.gender = $gender
 RETURN p.id, p.firstName, count(q) AS friendCount""",
     # k=2, attribute aggregation boundary
     """MATCH (f:Forum)-[:CONTAINER_OF]->(m:Post)-[:HAS_TAG]->(t:Tag {name: $tag})
@@ -225,7 +230,7 @@ Hard rules (a query violating any rule is discarded):
 1. Read-only. Use only MATCH, WHERE, WITH, ORDER BY, LIMIT, RETURN. No OPTIONAL MATCH, UNWIND, CALL, subqueries, EXISTS, or list comprehensions.
 2. Segments are separated by WITH. Each boundary WITH must contain an aggregation (count/avg/min/max/sum) and may be followed by WHERE on the aggregate or ORDER BY ... LIMIT. WHERE and ORDER BY after a WITH or RETURN may only refer to aliases defined in that WITH/RETURN (e.g. `ORDER BY postCount DESC`), never to `var.property`.
 3. After a WITH, ONLY the variables listed in that WITH exist. Segment i+1 must start from a node variable listed in the preceding WITH, written without a label, e.g. after `WITH f, count(m) AS c` write `MATCH (f)-[...]->...`. Any other variable from segment i (e.g. `p`) no longer exists: writing `MATCH (p)` would create a new, unrelated variable.
-4. Segment 1 must filter on a node property other than `id` BEFORE its WITH, either inline (`(t:Tag {{name: $tag}})`) or in a WHERE (`WHERE p.birthday > $date`), or its WITH must aggregate a property other than `id` (e.g. `avg(m.length)`). Counting nodes alone (`count(p)` with no property filter) is not enough. Every later segment must ALSO filter on a non-id property of one of its own nodes in its MATCH/WHERE (returning a property in RETURN does not count).
+4. Segment 1 must filter on a node property other than `id` BEFORE its WITH, either inline (`(t:Tag {{name: $tag}})`) or in a WHERE (`WHERE p.creationDate > $date`), or its WITH must aggregate a property other than `id` (e.g. `avg(m.length)`). Counting nodes alone (`count(p)` with no property filter) is not enough. Every later segment must ALSO filter on a non-id property of one of its own nodes in its MATCH/WHERE (returning a property in RETURN does not count).
 5. Never filter on `id`. When a variable is first introduced it must carry a label, e.g. `(m:Post)`. Only use labels and the properties listed for that label (e.g. Tag has only id and name, no creationDate), and every relationship must point in exactly the direction listed in the schema (e.g. `(c:Comment)-[:HAS_CREATOR]->(p:Person)`, never `(p:Person)-[:HAS_CREATOR]-(c:Comment)` or `(p)-[:HAS_CREATOR]->(c)`). There are no relationship properties.
 6. Use $placeholders for every constant, including LIMIT ($k) and thresholds ($n). Do not use equality on datetime properties. Do not use STARTS WITH, ENDS WITH, CONTAINS or regex.
 7. The queries must be semantically meaningful: each stage should narrow down or rank entities that the next stage explores. Write a one-sentence natural-language description for each.
@@ -242,7 +247,7 @@ RIGHT, group by the variable segment 2 continues from (here `p`) and filter on p
   WITH p, count(fo) AS forumCount WHERE forumCount > $n
   MATCH (p)-[:KNOWS*1..2]-(f:Person)
   WHERE f.gender = $gender
-  RETURN f.browserUsed, count(DISTINCT p) AS activeFriends
+  RETURN f.firstName, count(DISTINCT p) AS activeFriends
 WRONG, relationship direction: (p:Person)-[:HAS_CREATOR]-(po:Post). RIGHT: (po:Post)-[:HAS_CREATOR]->(p:Person).
 
 Examples of the expected style (they do not follow the shape specification above):
