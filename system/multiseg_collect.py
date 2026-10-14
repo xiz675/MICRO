@@ -556,8 +556,16 @@ class SegmentExecutor:
                     tm["move_seg"] = sum(self.mover.seg_time(t, l, c) for t, l, c in plan.move_seg)
                     tm["movement_reused"] = True
                 else:
+                    # ICDE flow (run_workload.py): clean the labels before and after every plan
+                    self.ex.clean_data(set(labels))
                     tm["pre_base"], _ = self._timed(self.ex.run_table_movement_query, move_base)
                     tm["move_seg"], _ = self._timed(self.ex.run_table_movement_query, move_seg)
+                    for table, label, _c in move_base + move_seg:          # not timed: verify the load
+                        n = int(neo4j_scalar(self.nj, f"MATCH (n:{label}T) RETURN count(n)") or 0)
+                        r = self.pg.run_query_return_result(f"select count(*) from {table}")
+                        if r and n != int(r[0][0]):
+                            raise RuntimeError(f"movement of {table} into :{label}T loaded {n} nodes, "
+                                               f"the table has {r[0][0]} rows")
             except Exception as e:     # noqa: BLE001
                 tm.update(status="error", error=f"table movement: {e}")
                 return tm
