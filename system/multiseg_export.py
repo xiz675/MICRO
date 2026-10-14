@@ -116,6 +116,9 @@ def main():
     ap.add_argument("--k", type=int, default=2, help="export only k-segment queries")
     ap.add_argument("--test-ratio", type=float, default=0.2, help="0 writes everything to train/")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--include-inconsistent", action="store_true",
+                    help="also export queries whose plans ran but whose outputs differ (checksum mismatch); queries "
+                         "with failed plans are still skipped")
     args = ap.parse_args()
 
     paths = [p for pat in args.results for p in sorted(glob.glob(pat))]
@@ -126,7 +129,8 @@ def main():
                 rec = json.loads(line)
                 if rec.get("k") != args.k:
                     skipped[f"k={rec.get('k')}"] += 1
-                elif not rec.get("usable_for_training"):
+                elif not rec.get("usable_for_training") and not (
+                        args.include_inconsistent and not any(c["plan_errors"] for c in rec.get("consistency", []))):
                     skipped["plan errors / inconsistent outputs"] += 1
                 elif any(p is None for p in rec.get("neo4j_raw_plans", [None])) or \
                         len(rec.get("neo4j_raw_plans", [])) != args.k:
