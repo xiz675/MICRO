@@ -694,7 +694,16 @@ def run_composite(make_executor, rewriters, plans_by_stage, combo, outputs) -> f
             if i > 0 and plan.seg_moved:
                 done[i - 1].wait()
                 ex.ex.run_table_movement_query(moves[len(plan.move_base):])
-            ex.run_graph(cypher, nj_table)
+            _, g_rows, g_status = ex.run_graph(cypher, nj_table)
+            if g_status != "ok":
+                raise RuntimeError(f"segment {i + 1} graph query: {g_status}")
+            if g_rows == 0:
+                # empty graph result: the segment's result is empty, there is no table to run the SQL on
+                if not last:
+                    raise RuntimeError(f"segment {i + 1}: empty graph result in a non-final segment")
+                if plan.split:
+                    done[i - 1].wait()
+                return
             if plan.split:
                 ra = f"r{i + 1}a"
                 ex.pg.run_query(f'DROP TABLE IF EXISTS "{ra}"')

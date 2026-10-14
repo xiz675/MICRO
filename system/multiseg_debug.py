@@ -81,10 +81,85 @@ def debug_query(qi, mq, nj, pg, max_records):
     print()
 
 
+def _sql_diff(pg, a, b):
+    try:
+        x = q1(pg, f"select count(*) from (select * from {a} except all select * from {b}) t")
+        y = q1(pg, f"select count(*) from (select * from {b} except all select * from {a}) t")
+    except Exception as e:      # noqa: BLE001
+        return f"cannot compare: {e}"
+    out = f"rows only in {a}: {x}, only in {b}: {y}"
+    if x or y:
+        out += f"\n        e.g. only in {a}: " + str(pg.run_query_return_result(
+            f"(select * from {a} except all select * from {b}) limit 3"))
+        out += f"\n        e.g. only in {b}: " + str(pg.run_query_return_result(
+            f"(select * from {b} except all select * from {a}) limit 3"))
+    return out
+
+
+def compare_segment(qi, mq, seg, nj, pg):
+    """run every plan of one segment (per-plan movement, as in the ICDE runs) and show how each plan's output
+    differs from the canonical plan's: row counts, rows only in one of them, column types"""
+    from collections import Counter
+    from utils.run_plan_util import RunPlan
+    stages, rws = mc.build_rewriters(mq, keep_params=False)
+    i = seg - 1
+    last = i == len(stages) - 1
+    ex = mc.SegmentExecutor(RunPlan(pg, nj), timeout_count=True, keep_result=True)
+    print(f"################ query {qi}, segment {seg} ################")
+    for j in range(i):                       # previous segments: canonical plans, outputs kept as seg{j}
+        p = rws[j].rewrite([])
+        ex.run_plan(p, stages[j].output, False, ra_table=f"r{j + 1}a")
+        if p.split:
+            ex.run_rib(rws[j].rib_sql(f"r{j + 1}a"), stages[j].output, False)
+    types = lambda t: pg.run_query_return_result(  # noqa: E731
+        f"select column_name, data_type from information_schema.columns where table_name='{t}' order by ordinal_position")
+    finals = {}
+    for j, p in enumerate(rws[i].plans()):
+        tm = ex.run_plan(p, stages[i].output, last, ra_table=f"r{i + 1}a")
+        print(f"  plan {j}: moved={p.moved} split={p.split} status={tm['status']} {tm.get('error', '')} "
+              f"graph_rows={tm.get('graph_rows')} sql_rows={tm.get('sql_rows')}")
+        if tm["status"] != "ok":
+            continue
+        if p.split:                          # plan-specific part R_ia must be identical across split plans
+            pg.run_query(f"DROP TABLE IF EXISTS cmp_ra{j}")
+            pg.run_query(f'CREATE TABLE cmp_ra{j} AS SELECT * FROM "r{i + 1}a"')
+            rb = ex.run_rib(rws[i].rib_sql(f"r{i + 1}a"), stages[i].output, last)
+            res = ex.last_result if last else None
+        else:
+            res = ex.last_result if last else None
+        if last:
+            finals[j] = Counter(map(str, res or []))
+        else:
+            pg.run_query(f"DROP TABLE IF EXISTS cmp_p{j}")
+            pg.run_query(f'CREATE TABLE cmp_p{j} AS SELECT * FROM "{stages[i].output}"')
+    plans = rws[i].plans()
+    split_ids = [j for j, p in enumerate(plans) if p.split and q1(pg, f"select to_regclass('cmp_ra{j}') is not null")]
+    if split_ids:
+        r0 = split_ids[0]
+        print(f"\n  R_{seg}a columns (plan {r0}): {types(f'cmp_ra{r0}')}")
+        for j in split_ids[1:]:
+            print(f"  R_{seg}a plan {j} {plans[j].moved} vs plan {r0}: {_sql_diff(pg, f'cmp_ra{j}', f'cmp_ra{r0}')}")
+    if last:
+        base = finals.get(0)
+        print(f"\n  final result of plan 0: {sum(base.values()) if base is not None else None} rows")
+        for j, c in finals.items():
+            if j and base is not None and c != base:
+                print(f"  final plan {j} {plans[j].moved}: {sum(c.values())} rows; "
+                      f"only in plan 0: {list((base - c).elements())[:3]}; only in plan {j}: {list((c - base).elements())[:3]}")
+    else:
+        print(f"\n  output columns (plan 0): {types('cmp_p0')}")
+        for j in range(1, len(plans)):
+            if q1(pg, f"select to_regclass('cmp_p{j}') is not null"):
+                print(f"  output plan {j} {plans[j].moved} vs plan 0: {_sql_diff(pg, f'cmp_p{j}', 'cmp_p0')}")
+    print()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("queries")
     ap.add_argument("--query", type=int, nargs="+", required=True)
+    ap.add_argument("--compare-segment", type=int, default=None,
+                    help="run every plan of this segment (1-based) and show how their outputs differ")
     ap.add_argument("--max-records", type=int, default=mc.MAX_RECORDS)
     ap.add_argument("--nj-uri", default="lero-neo4j-sf1:7687")
     ap.add_argument("--nj-db", default="neo4j")
@@ -102,7 +177,10 @@ def main():
     pg.connect()
     queries = [json.loads(l) for l in open(args.queries)]
     for qi in args.query:
-        debug_query(qi, queries[qi], nj, pg, args.max_records)
+        if args.compare_segment:
+            compare_segment(qi, queries[qi], args.compare_segment, nj, pg)
+        else:
+            debug_query(qi, queries[qi], nj, pg, args.max_records)
 
 
 if __name__ == "__main__":
