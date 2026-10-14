@@ -177,6 +177,17 @@ class FakeNeo4j:
             self.moved.pop(d.group(1), None)      # clean_data deletes all nodes with that label
         self.executed.append(query)
 
+    def scalar(self, query):
+        m = re.match(r"MATCH \(n:(\w+)\) RETURN count\(n\)$", query)
+        if m:
+            if m.group(1) not in self.moved:
+                return 0
+            table, copies = self.moved[m.group(1)]
+            return copies * self.pg.run_query_return_result(f"select count(*) from {table}")[0][0]
+        if query.startswith("CALL db.labels()"):
+            return sorted(self.moved)
+        raise NotImplementedError(query)
+
     def run_query_return_single_value(self, query):
         inner = re.search(r'runTimeboxed\("(.*)", \{\}', query, re.S).group(1)
         sql = self.to_sql(re.sub(r"(?is)return count\(\*\)$", "RETURN 1 as one", inner))
@@ -322,6 +333,54 @@ def test_driver(make_executor) -> int:
                rec2["usable_for_training"] and same and not seg_left)
     expect(f"movement cache reused across plans/queries (hits={ex_reuse.mover.hits}, misses={ex_reuse.mover.misses})",
            ex_reuse.mover.hits > ex_reuse.mover.misses)
+
+    # 0) nodes left in Neo4j by an earlier run with another result directory (another cache file) must not be
+    #    duplicated: the pilot on the real data had join results x3 after two earlier precheck runs
+    mq_l = mq_of(FEW_SHOT[1])
+    ref, _ = mc.collect_query(mq_l, ex, keep_params=False, repeat=1, dry_run=False)
+    for _ in range(2):                                  # two "earlier runs", each with a fresh cache file
+        e2 = make_executor()
+        e2.mover = mc.MovementManager(e2.ex, os.path.join(tempfile.mkdtemp(), "c.json"), db_key="test", repeat=1)
+        mc.collect_query(mq_l, e2, keep_params=False, repeat=1, dry_run=False)
+    e3 = make_executor()
+    e3.mover = mc.MovementManager(e3.ex, os.path.join(tempfile.mkdtemp(), "c.json"), db_key="test", repeat=1)
+    rec3, _ = mc.collect_query(mq_l, e3, keep_params=False, repeat=1, dry_run=False)
+    dup = [l for l, (_, c) in FakeNeo4j.moved.items() if c > 1]
+    same = all(json.dumps(a["timings"].get("checksum")) == json.dumps(b["timings"].get("checksum"))
+               for sa, sb in zip(ref["segments"], rec3["segments"]) for a, b in zip(sa, sb))
+    expect(f"leftover persistent nodes from earlier runs are replaced, not duplicated (duplicated labels: {dup})",
+           not dup and same and rec3["usable_for_training"])
+    # a cache file claiming a table is loaded while Neo4j has no nodes (e.g. Neo4j reloaded) -> reloaded
+    for lab in [l for l in list(FakeNeo4j.moved) if l.startswith("MS_")]:
+        FakeNeo4j.moved.pop(lab)
+    rec4, _ = mc.collect_query(mq_l, e3, keep_params=False, repeat=1, dry_run=False)
+    e4 = make_executor()
+    e4.mover = mc.MovementManager(e4.ex, e3.mover.cache_path, db_key="test", repeat=1)
+    for lab in [l for l in list(FakeNeo4j.moved) if l.startswith("MS_")]:
+        FakeNeo4j.moved.pop(lab)
+    rec5, _ = mc.collect_query(mq_l, e4, keep_params=False, repeat=1, dry_run=False)
+    expect("persistent label missing in Neo4j although the cache says loaded -> verified and reloaded",
+           rec5["usable_for_training"] and not any(c["plan_errors"] for c in rec5["consistency"]))
+    # a load that leaves the wrong number of nodes is reported as a plan error, not as a wrong result
+    orig_load = FakeNeo4j.run_query
+
+    def broken(self, query):
+        if "'Post'" in query and "CREATE (x:MS_" in query:
+            return                                    # load silently does nothing (like a failed apoc job)
+        return orig_load(self, query)
+    e5 = make_executor()
+    e5.mover = mc.MovementManager(e5.ex, os.path.join(tempfile.mkdtemp(), "c.json"), db_key="test", repeat=1)
+    e5.mover.purge_all()
+    FakeNeo4j.run_query = broken
+    try:
+        rec6, _ = mc.collect_query(mq_of(FEW_SHOT[0]), e5, keep_params=False, repeat=1, dry_run=False)
+    finally:
+        FakeNeo4j.run_query = orig_load
+    errs = [e for c in rec6["consistency"] for e in c["plan_errors"]]
+    expect(f"failed movement is a plan error ({str(errs)[:90]}...)", errs and not rec6["usable_for_training"])
+    purged = e5.mover.purge_all()
+    expect(f"purge_all removes all collector labels ({len(purged)} labels)",
+           not [l for l in FakeNeo4j.moved if mc.OWN_LABEL_RE.match(l)])
 
     # 1) broken query: relationship type that does not exist -> precheck fails as a query error
     mq = mq_of(FEW_SHOT[1])

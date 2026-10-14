@@ -349,6 +349,18 @@ def py_checksum(rows) -> list:
     return [len(rows or []), h]
 
 
+def neo4j_scalar(nj, query: str):
+    """first column of the first record (Neo4jUtil has no generic helper; tests provide .scalar)"""
+    if hasattr(nj, "scalar"):
+        return nj.scalar(query)
+    records = nj._driver.execute_query(query).records
+    return records[0][0] if records else None
+
+
+# labels created by this collector (base tables, timing scratch, seg results, per-plan and validation copies)
+OWN_LABEL_RE = re.compile(r"^(MS_|MT_|S\d+|P_|V\d+_)\w*T$")
+
+
 class MovementManager:
     """Component-wise collection of relation movements (PG -> Neo4j).
 
@@ -358,6 +370,12 @@ class MovementManager:
       union of the columns needed so far, so plans never reload them;
     * seg{i-1} is loaded once per segment (also timed with `repeat`) and deleted when the query is done.
     Movement time is still part of every composed latency; only the execution is shared.
+
+    Every load is checked: the label is emptied first (nodes left by an earlier run or another result
+    directory would otherwise be duplicated and multiply join results), and afterwards the number of nodes
+    must equal the number of rows of the table; a persistent label taken over from the cache file is
+    verified the same way once per run. A failed load raises, so the plan is reported as a movement error
+    instead of silently returning a wrong or empty result.
     """
 
     def __init__(self, run_plan, cache_path: str, db_key: str, repeat: int = 3):
@@ -367,6 +385,7 @@ class MovementManager:
             with open(cache_path) as f:
                 self.state.update(json.load(f))
         self.persistent = self.state["persistent"].setdefault(db_key, {})
+        self.verified = set()         # persistent tables whose node count was checked in this run
         self.seg_loaded = {}          # label -> measured seconds (current query)
         self.hits = self.misses = 0
 
@@ -375,12 +394,33 @@ class MovementManager:
             with open(self.cache_path, "w") as f:
                 json.dump(self.state, f, indent=1)
 
+    def _nodes(self, label: str) -> int:
+        return int(neo4j_scalar(self.ex.neo4j_util, f"MATCH (n:{label}T) RETURN count(n)") or 0)
+
+    def _rows(self, table: str) -> int:
+        r = self.ex.pg_util.run_query_return_result(f"select count(*) from {table}")
+        return int(r[0][0]) if r else -1
+
+    def _load(self, table: str, label: str, cols: list):
+        """empty the label, load the table, check the node count"""
+        self.ex.clean_data({label})
+        self.ex.run_table_movement_query([(table, label, sorted(cols))])
+        n, expected = self._nodes(label), self._rows(table)
+        if n != expected:
+            raise RuntimeError(f"movement of {table} into :{label}T loaded {n} nodes, the table has {expected} rows")
+
     def _measure(self, table: str, cols: list) -> float:
         samples = []
-        for _ in range(self.repeat):
+        self.ex.clean_data({f"MT_{table}"})
+        for k in range(self.repeat):
             t = time.time()
             self.ex.run_table_movement_query([(table, f"MT_{table}", sorted(cols))])
             samples.append(time.time() - t)
+            if k == 0:
+                n, expected = self._nodes(f"MT_{table}"), self._rows(table)
+                if n != expected:
+                    self.ex.clean_data({f"MT_{table}"})
+                    raise RuntimeError(f"movement of {table} loaded {n} nodes, the table has {expected} rows")
             self.ex.clean_data({f"MT_{table}"})
         return sorted(samples)[len(samples) // 2]
 
@@ -397,18 +437,23 @@ class MovementManager:
     def ensure_persistent(self, table: str, label: str, cols: list):
         loaded = set(self.persistent.get(table, []))
         if set(cols) <= loaded:
-            return
+            if table in self.verified:
+                return
+            if self._nodes(label) == self._rows(table):     # taken over from the cache file: check once
+                self.verified.add(table)
+                return
         union = sorted(loaded | set(cols))
-        if loaded:
-            self.ex.clean_data({label})
-        self.ex.run_table_movement_query([(table, label, union)])
+        self.persistent.pop(table, None)
+        self._save()
+        self._load(table, label, union)
         self.persistent[table] = union
+        self.verified.add(table)
         self._save()
 
     def seg_time(self, table: str, label: str, cols: list) -> float:
         if label not in self.seg_loaded:
             self.seg_loaded[label] = self._measure(table, cols)
-            self.ex.run_table_movement_query([(table, label, sorted(cols))])
+            self._load(table, label, cols)
         return self.seg_loaded[label]
 
     def end_query(self):
@@ -420,7 +465,19 @@ class MovementManager:
         if self.persistent:
             self.ex.clean_data({f"MS_{t}" for t in self.persistent})
         self.persistent.clear()
+        self.verified.clear()
         self._save()
+
+    def purge_all(self):
+        """delete every node with a label created by this collector (any run, any result directory)"""
+        labels = neo4j_scalar(self.ex.neo4j_util, "CALL db.labels() YIELD label RETURN collect(label)") or []
+        own = [l[:-1] for l in labels if OWN_LABEL_RE.match(l)]
+        if own:
+            self.ex.clean_data(set(own))
+        self.persistent.clear()
+        self.verified.clear()
+        self._save()
+        return own
 
 
 class SegmentExecutor:
@@ -926,7 +983,8 @@ def main():
                     help="load/delete moved tables for every plan (baseline for the collection-time comparison)")
     ap.add_argument("--movement-repeat", type=int, default=3, help="timed loads per (table, columns); median")
     ap.add_argument("--reset-persistent", action="store_true",
-                    help="delete the persistent base-table nodes first (e.g. after switching T1/T2 or a Neo4j reload)")
+                    help="delete all nodes this collector created in Neo4j (any earlier run) first; use it when switching "
+                         "T1/T2, after a Neo4j reload, or when an earlier run was interrupted")
     ap.add_argument("--drop-persistent-at-end", action="store_true")
     ap.add_argument("--shard", default=None,
                     help="i/n: run only shard i (0-based) of n, for splitting a workload across machines; queries "
@@ -981,7 +1039,8 @@ def main():
                                            db_key=f"{args.nj_uri}/{args.nj_db}|{args.pg_host}/{args.pg_db}",
                                            repeat=args.movement_repeat)
             if args.reset_persistent:
-                seg_ex.mover.drop_persistent()
+                purged = seg_ex.mover.purge_all()
+                print(f"removed collector nodes from Neo4j: {sorted(purged) or 'none'}")
 
     queries = [json.loads(l) for l in open(args.queries)]
     ids = list(range(len(queries))) if args.query is None else list(args.query)
@@ -1067,7 +1126,7 @@ def main():
         # real flow on a clean graph: persistent base-table nodes are removed first, every branch loads
         # and deletes its own moved tables, independent branches run in parallel threads
         if seg_ex.mover:
-            seg_ex.mover.drop_persistent()
+            seg_ex.mover.purge_all()          # also removes V*/P* copies left by an interrupted run
         val_path = os.path.join(args.result_dir, "validation.jsonl")
         rel_err = []
         with open(val_path, "w") as vf:
