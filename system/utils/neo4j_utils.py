@@ -81,8 +81,9 @@ class Neo4jUtil:
                 csv_buffer = StringIO()
                 csv_writer = csv.writer(csv_buffer)
 
-                csv_writer.writerow([peek_record[col] for col in cols])
-                num_rows_in_buffer = 1
+                # peek() does not consume the record: the loop below yields it again, so it must not be
+                # written here as well (it used to be, which duplicated the first row of every result)
+                num_rows_in_buffer = 0
 
                 for record in result:
                     csv_writer.writerow([record[col] for col in cols])
