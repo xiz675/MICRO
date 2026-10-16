@@ -22,7 +22,9 @@ For k-segment queries (default k=2) it writes, per split (train/ and test/):
     plus "SEG" = median actual size of the exported seg tables (CMLero needs a size for every moved
     relation; no per-query seg size is exposed)
 * composite.json: per query, every composite plan with its composed end-to-end latency
-    {"query_id", "original", "composites": [{"plans": [j1, j2], "seg1_moved": bool, "latency": s}]}
+    {"query_id", "original", "seg_rows": [n1], "composites": [{"plans": [j1, j2], "seg1_moved": bool, "latency": s}]}
+  seg_rows: actual number of rows of seg1..seg{k-1} for that query (not known before seg1 runs; usable as an
+  auxiliary target or for an oracle variant of the SEG size).
   j_i indexes all_plans_with_runtime.json of seg<i> for that query. Whether seg{i-1} is moved (sequential)
   or not (parallel) is also visible in the seg<i> plan itself: it contains a tuple with table label "SEG".
   Pairs are not materialised: build them within a query, as CMLero's get_pairwise_plan does.
@@ -71,7 +73,7 @@ def export_query(rec: dict) -> dict:
                    "latency": OUT_OF_TIME_QUERY_TIME if c.get("timeout") else c["latency"]}
                   for c in rec["composite"] if not c.get("error")]
     return {"segments": segs, "composite": {"query_id": rec.get("query_id"), "original": rec["original"],
-                                            "composites": composites}}
+                                            "seg_rows": seg_sizes(rec), "composites": composites}}
 
 
 def seg_sizes(rec: dict) -> list:
