@@ -6,6 +6,7 @@ For k-segment queries (default k=2) it writes, per split (train/ and test/):
     seg1/  cypher_raw_plans.json  workloads.json  all_plans_with_runtime.json  rel_stats.json
     seg2/  (same four files)
     composite.json
+    seg_rows.txt   one line per query (same order as the files above): actual number of rows of seg1
 
 * seg<i>/ has exactly the ICDE format (CMLero/load_workloads.py: prepare_input(prefix)), one entry per
   query, aligned across seg1/, seg2/ and composite.json (entry q is the same query everywhere).
@@ -106,6 +107,10 @@ def write_split(out_dir: str, entries: list, k: int, rel_stats: dict):
             json.dump(rel_stats, f, indent=2)
     with open(os.path.join(out_dir, "composite.json"), "w") as f:
         json.dump([e["composite"] for e in entries], f, indent=2)
+    # one line per query, aligned with seg<i>/*.json and composite.json: actual size of seg1 (seg2, ... for k > 2)
+    with open(os.path.join(out_dir, "seg_rows.txt"), "w") as f:
+        for e in entries:
+            f.write(" ".join(str(n) for n in e["composite"]["seg_rows"]) + "\n")
 
 
 def main():
