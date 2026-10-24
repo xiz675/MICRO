@@ -58,6 +58,8 @@ def main():
     ap.add_argument("--timeout", type=float, default=1800, help="statement timeout in seconds")
     ap.add_argument("--repeat", type=int, default=1, help="runs per query, median time reported")
     ap.add_argument("--dry-run", action="store_true", help="only write xdb_queries.sql")
+    ap.add_argument("--search-path", default=None,
+                    help='e.g. "t1, public": schema with the foreign r_* tables of the configuration first')
     ap.add_argument("--pg-host", default="localhost")
     ap.add_argument("--pg-port", type=int, default=5432)
     ap.add_argument("--pg-db", default="postgres")
@@ -93,6 +95,8 @@ def main():
     con.autocommit = True
     cur = con.cursor()
     cur.execute(f"SET statement_timeout = {int(args.timeout * 1000)}")
+    if args.search_path:
+        cur.execute(f"SET search_path TO {args.search_path}")
     summary = {"ok": 0, "timeout": 0, "error": 0, "untranslated": 0, "rows_mismatch": 0}
     with open(os.path.join(args.out_dir, "xdb_results.jsonl"), "w") as out:
         for i in ids:
