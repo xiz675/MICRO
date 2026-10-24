@@ -192,13 +192,61 @@ def decompose_multiseg(query: str, modify_labels: bool = True, expected_k: int =
 
 
 def _graph_stage_to_sql(cypher: str) -> str:
-    """Translate a stage's graph query into SQL over the edge tables (same logic as generate_equivelent_sql)."""
+    """Translate a stage's graph query into SQL over the edge tables (same logic as generate_equivelent_sql).
+    A bounded variable-length KNOWS pattern (*1..2) is expanded into one fixed-length query per length,
+    combined with UNION ALL (a row per path, as Neo4j returns them). Output columns are sorted by alias so
+    that the branches line up."""
     from generate_equivelent_sql import process_cypher_query
-    alias_rels, path_joins, filter_types, select_predicates = process_cypher_query(cypher)
-    select = ", ".join(f"{col.lower()} AS {alias.lower()}" for alias, col in select_predicates.items())
-    frm = ", ".join(f"{rel.lower()} {alias.lower()}" for alias, rel in alias_rels.items())
-    where = list(filter_types) + [f"{a.lower()}={b.lower()}" for a, b in path_joins]
-    return f"SELECT {select}\nFROM {frm}" + (("\nWHERE " + " and ".join(where)) if where else "")
+    variants = _expand_varlength(cypher)
+    if variants is None:
+        raise ValueError("unsupported variable-length pattern")
+    parts = []
+    for v in variants:
+        alias_rels, path_joins, filter_types, select_predicates = process_cypher_query(v)
+        select = ", ".join(f"{col.lower()} AS {alias.lower()}" for alias, col in sorted(select_predicates.items()))
+        frm = ", ".join(f"{rel.lower()} {alias.lower()}" for alias, rel in alias_rels.items())
+        where = list(filter_types) + [f"{a.lower()}={b.lower()}" for a, b in path_joins]
+        parts.append(f"SELECT {select}\nFROM {frm}" + (("\nWHERE " + " and ".join(where)) if where else ""))
+    return "\nUNION ALL\n".join(parts)
+
+
+_VARLEN_RE = re.compile(r"(<?-)\[:KNOWS\*(\d+)\.\.(\d+)\](->?)")
+
+
+def _expand_varlength(cypher: str):
+    """[cypher] if there is no variable-length pattern; one fixed-length variant per hop count for a directed
+    KNOWS*a..b (intermediate nodes are unlabelled-subset Person nodes, as in the Cypher semantics); None for
+    anything else (undirected, other relationship types, unbounded)."""
+    m = _VARLEN_RE.search(cypher)
+    if not m:
+        return None if "*" in re.split(r"(?i)\breturn\b", cypher)[0] else [cypher]
+    left, lo, hi, right = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
+    if not ((left == "-" and right == "->") or (left == "<-" and right == "-")) or hi > 3 or lo < 1:
+        return None
+    hop = "-[:KNOWS]->" if right == "->" else "<-[:KNOWS]-"
+    out = []
+    for n in range(lo, hi + 1):
+        chain = (hop + "(:Person)") * (n - 1) + hop
+        rest = _expand_varlength(cypher[:m.start()] + chain + cypher[m.end():])
+        if rest is None:
+            return None
+        out += rest
+    return out
+
+
+def _drop_param_predicates(sql: str) -> str:
+    """$param filters are not executed in CM-LDBC (the pre-filtered tables and subset labels realise them),
+    as in generate_equivelent_sql.py for the single-segment XDB queries"""
+    out = []
+    for line in sql.split("\n"):
+        m = re.match(r"(?i)^(\s*where\s+)(.*)$", line)
+        if m and "$" in line:
+            terms = [t for t in re.split(r"(?i)\s+and\s+", m.group(2)) if "$" not in t]
+            if not terms:
+                continue
+            line = m.group(1) + " and ".join(terms)
+        out.append(line)
+    return "\n".join(out)
 
 
 def _prefix_property_tables(sql: str) -> str:
@@ -217,15 +265,17 @@ def _prefix_property_tables(sql: str) -> str:
 
 
 def multiseg_to_sql(mq: MultiSegQuery):
-    """All-SQL equivalent: neo4j_i becomes a CTE over the edge tables. Variable-length paths are not
-    translated (same as the single-segment pipeline, which marks them TODO)."""
-    if any("*" in st.cypher for st in mq.stages):
-        return None
+    """All-SQL equivalent (XDB baseline): neo4j_i becomes a CTE over the edge tables; bounded directed KNOWS*a..b
+    is expanded with UNION ALL; $param filters are dropped. None when a pattern cannot be translated."""
     ctes = []
     for i, st in enumerate(mq.stages):
         idx = i + 1
-        ctes.append(f"neo4j{idx} AS (\n{_graph_stage_to_sql(st.cypher)}\n)")
-        body = _prefix_property_tables(re.sub(r"\bneo4j\b", f"neo4j{idx}", st.sql))
+        try:
+            graph = _graph_stage_to_sql(st.cypher)
+        except ValueError:
+            return None
+        ctes.append(f"neo4j{idx} AS (\n{graph}\n)")
+        body = _drop_param_predicates(_prefix_property_tables(re.sub(r"\bneo4j\b", f"neo4j{idx}", st.sql)))
         if idx < mq.k:
             ctes.append(f"{st.output} AS (\n{body}\n)")
         else:
